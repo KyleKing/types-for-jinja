@@ -33,6 +33,9 @@ readme = "docs/README.md"
 requires-python = ">=3.11.0"
 version = "0.0.1"
 
+[project.scripts]
+typed-jinja = "typed_jinja.cli:main"
+
 [project.urls]
 "Bug Tracker" = "https://github.com/kyleking/typed-jinja/issues"
 "Changelog" = "https://github.com/kyleking/typed-jinja/blob/main/docs/docs/CHANGELOG.md"
