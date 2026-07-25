@@ -1,0 +1,63 @@
+---
+name: CI Pipeline
+
+"on":
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - .github/workflows/ci_pipeline.yml
+      - typed_jinja/**
+      - tests/**
+      - uv.lock
+      - pyproject.toml
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Run static linters
+        run: uv run calcipy-lint lint.check
+
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+        python-version: ["3.11"]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Run test
+        run: uv run calcipy-test test.pytest
+
+  typecheck:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Run typecheck
+        run: uv run calcipy-types types.mypy
+
+      # pyright-action requires Python to be in PATH explicitly
+      # Based on: https://github.com/jakebailey/pyright-action/issues/10#issuecomment-1455220629
+      - name: Add uv Python to Path
+        run: echo "$(uv run python -c 'import sys; print(sys.prefix)')/bin" >> $GITHUB_PATH
+      - uses: jakebailey/pyright-action@v2
