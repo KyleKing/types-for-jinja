@@ -3,4 +3,4 @@ DISABLE_MKDOCS_2_WARNING = "true"
 _.python.venv = {path = ".venv"}
 
 [tools]
-python = ["3.11.0", "3.13.11"]
+python = ["3.11.11", "3.13.11"]

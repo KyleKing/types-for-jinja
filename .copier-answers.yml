@@ -12,7 +12,7 @@ copyright_date: '2026'
 development_branch: main
 doc_dir: docs
 extends_calcipy: false
-minimum_python: 3.11.0
+minimum_python: 3.11.11
 minimum_python_short: '3.11'
 package_name_py: typed_jinja
 project_description: Static type checker for Jinja2 templates via codegen and pyright
