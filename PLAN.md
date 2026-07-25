@@ -80,6 +80,31 @@ that is the whole point of codegen-first.
 3. A demo Django/Flask app is a later, optional showcase; note that Django's own DTL is
    not Jinja, so a Flask or standalone-Jinja demo is the cleaner first target.
 
+## Validation findings (spike, run against yak-shears)
+
+Ran the spike against real templates in `~/Developer/kyleking/yak-shears/yak_shears/_templates`.
+Those templates use `{% extends %}`/`{% block %}` inheritance (26 blocks, 7 extends),
+`{% if %}`/`{% for %}`/`{% set %}`, and filters (`length`, `tojson`, `title`, `sort`,
+`min`, `max`, `join`, `format`, `default`).
+
+What worked: on `error.html.jinja` (extends `base.html.jinja`, fills `{% block content %}`
+with `{{ message }}`), the transpiler skips the inheritance nodes it does not model yet but
+still extracts and checks the expressions inside the block. Correct header (`message: str`)
+passes clean; a `mesage` typo is caught at the right line.
+
+Two concrete gaps this surfaced, now the top v1.1 priorities:
+
+1. **Jinja Environment globals** (`static_url()`, `url_for()`, `get_flashed_messages()`).
+   These are injected into the `Environment.globals`, not passed per render, so a template
+   that calls one would be flagged as an undefined variable (false positive). v1 needs a
+   project-level declaration of global names/signatures (a config file or a `{#globals#}`
+   header) so the checker treats them as defined. This is the highest-value fix for Flask
+   and any real app.
+2. **Inheritance context flow.** A child template's effective context spans both the child
+   and its base (and any `{% include %}`). v1 checks one file at a time, so variables a base
+   template needs are not cross-checked against the child's header. Modeling `{% extends %}`
+   / `{% block %}` / `{% include %}` context flow is a real v1.1 feature.
+
 ## Open questions
 
 - Header ergonomics — does `{#def ... #}` feel right in real templates, or is a sidecar
