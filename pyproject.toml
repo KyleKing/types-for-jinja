@@ -160,6 +160,13 @@ all = true
 in_place = true
 trailing_comma_inline_array = true
 
+[tool.typed_jinja]
+imports = ["from collections.abc import Callable"]
+
+[tool.typed_jinja.globals]
+current_route = "str"
+static_url = "Callable[[str], str]"
+
 [tool.uv]
 default-groups = ["dev"]
 required-version = ">=0.9.0"

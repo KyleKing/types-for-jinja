@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from typed_jinja.config import load_config
 from typed_jinja.header import parse_header
 from typed_jinja.transpile import transpile
 
@@ -39,7 +40,7 @@ def check_file(path: Path, cache_dir: Path = _CACHE_DIR) -> list[Diagnostic]:
     header = parse_header(source)
     if header is None:
         return [Diagnostic(path, 1, 0, 'warning', 'no {#def ... #} type header; skipped', 'no-header')]
-    module = transpile(source, header)
+    module = transpile(source, header, load_config(Path.cwd()))
     cache_dir.mkdir(parents=True, exist_ok=True)
     _write_pyright_config(cache_dir)
     generated = cache_dir / f'{_safe_name(path)}.py'
@@ -49,7 +50,7 @@ def check_file(path: Path, cache_dir: Path = _CACHE_DIR) -> list[Diagnostic]:
         Diagnostic(
             path=path,
             line=_template_line(generated_lines, raw['range']['start']['line']),
-            column=raw['range']['start']['character'],
+            column=raw['range']['start']['character'] + 1,
             severity=raw['severity'],
             message=raw['message'].replace('\n', ' '),
             rule=raw.get('rule', ''),

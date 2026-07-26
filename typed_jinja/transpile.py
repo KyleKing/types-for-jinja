@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 
 from jinja2 import Environment, nodes
 
+from typed_jinja.config import Config
 from typed_jinja.header import TemplateHeader
 
 _CMP_OPS = {
@@ -45,10 +46,21 @@ class GeneratedModule:
     param_names: list[str] = field(default_factory=list)
 
 
-def transpile(source: str, header: TemplateHeader) -> GeneratedModule:
-    """Transpile ``source`` into a Python stub checkable against ``header``'s context."""
+def transpile(source: str, header: TemplateHeader, config: Config | None = None) -> GeneratedModule:
+    """Transpile ``source`` into a Python stub checkable against ``header``'s context.
+
+    ``config`` supplies project-wide Jinja Environment globals (for example
+    ``static_url``) so a template that references them is not flagged as undefined.
+    """
+    config = config or Config()
     tree = Environment(autoescape=True).parse(source)
-    lines: list[_Line] = [_Line(0, imp, header.lineno) for imp in header.imports]
+    param_names = {name for name, _ in header.params}
+    lines: list[_Line] = [_Line(0, imp, header.lineno) for imp in [*header.imports, *config.imports]]
+    lines.extend(
+        _Line(0, f'{name}: {type_str}', header.lineno)
+        for name, type_str in config.globals
+        if name not in param_names
+    )
     signature = ', '.join(f'{name}: {type_str}' for name, type_str in header.params)
     lines.append(_Line(0, f'def _render({signature}) -> None:', header.lineno))
     body: list[_Line] = []
