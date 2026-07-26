@@ -227,13 +227,18 @@ v1 is a checker that is quiet (globals), scriptable (JSON/SARIF), and drops into
 
 ### Status (current build)
 
-- Shipped: the checker (undefined variables plus attribute and item access), the CLI
-  with `--format text|json|sarif`, and the Environment globals declaration.
-- Shipped as a working proof (ahead of its v1.1 slot): the Level-1 typed wrapper with
-  Level-2 beartype and Pydantic enforcement in `examples/runtime`, so the runtime story
-  is verified before yak-shears adoption.
-- In progress: the LSP spike with Neovim integration, and v1 hardening (a pre-commit
-  hook, template-syntax and missing-pyright handling, broader Jinja node coverage).
+- Shipped (v1): the checker (undefined variables plus attribute and item access), the CLI
+  with `--format text|json|sarif`, the Environment globals declaration, a pre-commit hook,
+  and hardening (template-syntax and missing-pyright handling, broader Jinja coverage).
+- Shipped (v1.1): the LSP with Neovim integration and live unsaved-buffer checking; macro
+  bodies (body checked, calls get arity checking); cross-file `{% extends %}` base-context
+  and `{% import %}`/`{% from import %}` macro resolution; stable rule codes (`TJ###`) with
+  inline `{# type: ignore #}` suppression.
+- Shipped as a working proof: the Level-1 typed wrapper with Level-2 beartype and Pydantic
+  enforcement in `examples/runtime`, so the runtime story is verified before yak-shears.
+- Deferred: typed macro params (a bad attribute on a param inside a macro body is not yet
+  caught), `{% include %}` context flow, multi-level `extends`, and full filter type
+  signatures (filter results are `Any`).
 
 ## Scope
 
@@ -247,18 +252,21 @@ v1 is a checker that is quiet (globals), scriptable (JSON/SARIF), and drops into
 - JSON / SARIF output
 - CLI `typed-jinja check <paths>` with non-zero exit on errors
 
-**Deferred to v1.1+ (explicit non-goals for now):**
-- LSP / editor diagnostics (spike in progress)
+**Landed in v1.1 (see Status above):** the LSP with live-buffer checking, macro bodies,
+cross-file `{% extends %}`/`{% import %}` context, and rule codes with inline suppression.
+
+**Still deferred:**
 - Productizing the typed wrapper codegen (Level 1) and runtime enforcement (Level 2)
   into the CLI and a documented workflow. The mechanism is proven in `examples/runtime`;
   what remains is wiring, not feasibility.
+- Typed macro params, so a bad attribute on a param inside a macro body is caught
+- `{% include %}` cross-template context, multi-level `{% extends %}` chains
+- Full filter and test type signatures (results are `Any` today)
 - Extension-tag declaration (rung 2)
 - Framework adapters (Flask, Django-Jinja2, FastAPI) that locate "this view renders
   this template with this context"
 - Sidecar/registry binding as an alternative to the header
-- Macro (`{% macro %}`) arg-count/type checking
-- Full filter type signatures, custom extensions, i18n, and `{% include %}` /
-  `{% extends %}` / `{% import %}` cross-template context flow
+- Custom extensions, i18n
 - Non-HTML targets (dbt-style SQL), which are a different program
 
 ## Validation targets
