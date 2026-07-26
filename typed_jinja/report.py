@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from typed_jinja.check import Diagnostic
+from typed_jinja.diagnostic import Diagnostic
 
 _SARIF_SCHEMA = 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json'
 _SARIF_LEVELS = {'error': 'error', 'warning': 'warning'}
@@ -26,6 +26,7 @@ def format_json(diags: list[Diagnostic]) -> str:
             'severity': diag.severity,
             'message': diag.message,
             'rule': diag.rule,
+            'code': diag.code,
         }
         for diag in diags
     ]
@@ -48,19 +49,21 @@ def format_sarif(diags: list[Diagnostic]) -> str:
 
 
 def _text_line(diag: Diagnostic) -> str:
-    rule = f' ({diag.rule})' if diag.rule else ''
-    return f'{diag.path}:{diag.line}:{diag.column} {diag.severity}: {diag.message}{rule}'
+    tag = f'{diag.code} {diag.rule}'.strip() if diag.code else diag.rule
+    suffix = f' ({tag})' if tag else ''
+    return f'{diag.path}:{diag.line}:{diag.column} {diag.severity}: {diag.message}{suffix}'
 
 
 def _sarif_rules(diags: list[Diagnostic]) -> list[dict[str, str]]:
-    return [{'id': rule} for rule in sorted({diag.rule for diag in diags if diag.rule})]
+    return [{'id': rule_id} for rule_id in sorted({diag.code or diag.rule for diag in diags if diag.code or diag.rule})]
 
 
 def _sarif_result(diag: Diagnostic) -> dict[str, Any]:
     return {
-        'ruleId': diag.rule or 'typed-jinja',
+        'ruleId': diag.code or diag.rule or 'typed-jinja',
         'level': _SARIF_LEVELS.get(diag.severity, 'warning'),
         'message': {'text': diag.message},
+        'properties': {'pyrightRule': diag.rule},
         'locations': [
             {
                 'physicalLocation': {
