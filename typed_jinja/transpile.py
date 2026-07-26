@@ -9,11 +9,13 @@ line carries a ``# L<n>`` marker back to its source line in the template.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 
-from jinja2 import Environment, nodes
+from jinja2 import Environment, TemplateSyntaxError, nodes
 
 from typed_jinja.config import Config
 from typed_jinja.header import TemplateHeader
+from typed_jinja.resolve import resolve_template
 
 _CMP_OPS = {
     'eq': '==',
@@ -46,15 +48,25 @@ class GeneratedModule:
     param_names: list[str] = field(default_factory=list)
 
 
-def transpile(source: str, header: TemplateHeader, config: Config | None = None) -> GeneratedModule:
+def transpile(
+    source: str,
+    header: TemplateHeader,
+    config: Config | None = None,
+    template_path: Path | None = None,
+) -> GeneratedModule:
     """Transpile ``source`` into a Python stub checkable against ``header``'s context.
 
     ``config`` supplies project-wide Jinja Environment globals (for example
     ``static_url``) so a template that references them is not flagged as undefined.
+    ``template_path`` locates the template on disk so ``extends`` / ``import`` /
+    ``from import`` references can be resolved against it and ``config.template_dirs``.
     """
     config = config or Config()
-    tree = Environment(autoescape=True).parse(source)
+    env = Environment(autoescape=True)
+    tree = env.parse(source)
+    search_dirs = _search_dirs(template_path, config)
     param_names = {name for name, _ in header.params}
+
     lines: list[_Line] = [_Line(0, imp, header.lineno) for imp in [*header.imports, *config.imports]]
     lines.extend([
         _Line(0, 'from typing import Any as _TJAny', header.lineno),
@@ -65,15 +77,40 @@ def transpile(source: str, header: TemplateHeader, config: Config | None = None)
         for name, type_str in config.globals
         if name not in param_names
     )
+
+    module_defs: list[_Line] = []
+    render_nodes: list[nodes.Node] = []
+    base_nodes: list[nodes.Node] = []
+    for node in tree.body:
+        match node:
+            case nodes.Macro():
+                _emit_macro(node, module_defs)
+            case nodes.Extends():
+                base_nodes.extend(_load_base_nodes(node, search_dirs, module_defs, env))
+            case nodes.FromImport():
+                _emit_from_import(node, search_dirs, module_defs, env)
+            case nodes.Import():
+                _emit_import(node, search_dirs, module_defs, env)
+            case _:
+                render_nodes.append(node)
+    lines.extend(module_defs)
+
     signature = ', '.join(f'{name}: {type_str}' for name, type_str in header.params)
     lines.append(_Line(0, f'def _render({signature}) -> None:', header.lineno))
     body: list[_Line] = []
-    _emit_body(tree.body, body, 1)
+    _emit_body(render_nodes, body, 1)
+    _emit_body(base_nodes, body, 1)
     if not body:
         body.append(_Line(1, 'pass', header.lineno))
     lines.extend(body)
     code = '\n'.join(_render_line(line) for line in lines) + '\n'
     return GeneratedModule(code=code, param_names=[name for name, _ in header.params])
+
+
+def _search_dirs(template_path: Path | None, config: Config) -> list[Path]:
+    dirs = [Path(template_path).parent] if template_path is not None else []
+    dirs.extend(Path(directory) for directory in config.template_dirs)
+    return dirs
 
 
 def _render_line(line: _Line) -> str:
@@ -87,7 +124,7 @@ def _emit_body(body: list[nodes.Node], out: list[_Line], indent: int) -> None:
         _emit_node(node, out, indent)
 
 
-def _emit_node(node: nodes.Node, out: list[_Line], indent: int) -> None:  # ruff:ignore[complex-structure]
+def _emit_node(node: nodes.Node, out: list[_Line], indent: int) -> None:  # ruff:ignore[complex-structure, too-many-branches]
     match node:
         case nodes.Output():
             for child in node.nodes:
@@ -107,8 +144,11 @@ def _emit_node(node: nodes.Node, out: list[_Line], indent: int) -> None:  # ruff
             _emit_body(node.body, out, indent)
         case nodes.With():
             _emit_with(node, out, indent)
-        case nodes.Macro() | nodes.CallBlock():
-            return
+        case nodes.CallBlock():
+            _emit_expr_check(node.call, out, indent)
+            _emit_body(node.body, out, indent)
+        case nodes.Macro():
+            _emit_macro(node, out, indent=indent)
         case _:
             _emit_fallback_names(node, out, indent)
 
@@ -166,6 +206,105 @@ def _emit_with(node: nodes.With, out: list[_Line], indent: int) -> None:
             rendered = 'None'
         out.append(_Line(indent, f'{name} = {rendered}', node.lineno))
     _emit_body(node.body, out, indent)
+
+
+def _macro_params(node: nodes.Macro) -> str:
+    offset = len(node.args) - len(node.defaults)
+    return ', '.join(f'{arg.name}=None' if index >= offset else arg.name for index, arg in enumerate(node.args))
+
+
+def _emit_macro(node: nodes.Macro, out: list[_Line], *, indent: int = 0, alias: str | None = None) -> None:
+    name = alias or node.name
+    signature = _macro_params(node)
+    out.append(_Line(indent, f'def {name}({signature}) -> _TJAny:', node.lineno))
+    inner: list[_Line] = []
+    _emit_body(node.body, inner, indent + 1)
+    if not inner:
+        inner.append(_Line(indent + 1, 'pass', node.lineno))
+    out.extend(inner)
+
+
+def _emit_macro_stub(node: nodes.Macro, out: list[_Line], indent: int, *, alias: str | None = None) -> None:
+    name = alias or node.name
+    out.append(_Line(indent, f'def {name}({_macro_params(node)}) -> _TJAny: ...', node.lineno))
+
+
+def _const_str(node: nodes.Node) -> str | None:
+    return node.value if isinstance(node, nodes.Const) and isinstance(node.value, str) else None
+
+
+def _load_macros(template: nodes.Node, search_dirs: list[Path], env: Environment) -> dict[str, nodes.Macro] | None:
+    ref = _const_str(template)
+    if ref is None:
+        return None
+    resolved = resolve_template(ref, search_dirs)
+    if resolved is None:
+        return None
+    try:
+        tree = env.parse(resolved[1])
+    except TemplateSyntaxError:
+        return None
+    return {child.name: child for child in tree.body if isinstance(child, nodes.Macro)}
+
+
+def _load_base_nodes(
+    node: nodes.Extends,
+    search_dirs: list[Path],
+    module_defs: list[_Line],
+    env: Environment,
+) -> list[nodes.Node]:
+    ref = _const_str(node.template)
+    if ref is None:
+        return []
+    resolved = resolve_template(ref, search_dirs)
+    if resolved is None:
+        return []
+    try:
+        tree = env.parse(resolved[1])
+    except TemplateSyntaxError:
+        return []
+    top_level: list[nodes.Node] = []
+    for child in tree.body:
+        if isinstance(child, nodes.Macro):
+            _emit_macro(child, module_defs)
+        elif not isinstance(child, nodes.Block | nodes.Extends):
+            top_level.append(child)
+    return top_level
+
+
+def _emit_from_import(
+    node: nodes.FromImport,
+    search_dirs: list[Path],
+    module_defs: list[_Line],
+    env: Environment,
+) -> None:
+    macros = _load_macros(node.template, search_dirs, env)
+    if not macros:
+        return
+    for entry in node.names:
+        name, alias = entry if isinstance(entry, tuple) else (entry, entry)
+        macro = macros.get(name)
+        if macro is not None:
+            _emit_macro_stub(macro, module_defs, 0, alias=alias)
+
+
+def _emit_import(
+    node: nodes.Import,
+    search_dirs: list[Path],
+    module_defs: list[_Line],
+    env: Environment,
+) -> None:
+    macros = _load_macros(node.template, search_dirs, env)
+    if macros is None:
+        return
+    cls = f'_TJNS_{node.target}'
+    module_defs.append(_Line(0, f'class {cls}:', node.lineno))
+    if not macros:
+        module_defs.append(_Line(1, 'pass', node.lineno))
+    for macro in macros.values():
+        module_defs.append(_Line(1, '@staticmethod', macro.lineno))
+        _emit_macro_stub(macro, module_defs, 1)
+    module_defs.append(_Line(0, f'{node.target} = {cls}', node.lineno))
 
 
 def _emit_expr_check(expr: nodes.Node, out: list[_Line], indent: int) -> None:

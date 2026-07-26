@@ -8,13 +8,13 @@ def _code(source):
     return transpile(source, parse_header(source)).code
 
 
-def test_macro_is_skipped_without_crashing():
-    src = '{#def x: int #}\n{% macro card(title) %}{{ title }}{{ x }}{% endmacro %}\n{{ x }}'
+def test_macro_is_modeled_with_params():
+    src = '{#def x: int #}\n{% macro card(title) %}{{ title }}{% endmacro %}\n{{ card(x) }}'
 
     code = _code(src)
 
     assert 'def _render(x: int)' in code
-    assert 'title' not in code
+    assert 'def card(title)' in code
 
 
 def test_with_block_binds_local():

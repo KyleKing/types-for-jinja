@@ -13,6 +13,7 @@ class Config:
 
     imports: list[str] = field(default_factory=list)
     globals: list[tuple[str, str]] = field(default_factory=list)
+    template_dirs: list[str] = field(default_factory=list)
 
 
 def load_config(root: Path) -> Config:
@@ -27,4 +28,5 @@ def load_config(root: Path) -> Config:
     return Config(
         imports=list(table.get('imports', [])),
         globals=[(name, type_str) for name, type_str in declared.items()],
+        template_dirs=list(table.get('template_dirs', [])),
     )

@@ -1,0 +1,9 @@
+<!DOCTYPE html>
+<html>
+  <head><title>{% block title %}Site{% endblock %}</title></head>
+  <body class="{{ current_route }}">
+    <link rel="stylesheet" href="{{ static_url('css/main.css') }}">
+    <h1>{{ page_heading }}</h1>
+    {% block content %}{% endblock %}
+  </body>
+</html>

@@ -50,7 +50,7 @@ def _raw_diagnostics(source: str, path: Path, cache_dir: Path, config: Config | 
     if header is None:
         return [Diagnostic(path, 1, 1, 'warning', 'no {#def ... #} type header; skipped', 'no-header')]
     try:
-        module = transpile(source, header, config or load_config(Path.cwd()))
+        module = transpile(source, header, config or load_config(Path.cwd()), template_path=path)
     except TemplateSyntaxError as err:
         return [Diagnostic(path, err.lineno or 1, 1, 'error', f'template syntax error: {err.message}', 'syntax-error')]
     cache_dir.mkdir(parents=True, exist_ok=True)
