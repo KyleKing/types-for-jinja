@@ -6,30 +6,22 @@ import json
 import re
 import shutil
 import subprocess  # ruff:ignore[suspicious-subprocess-import]
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from jinja2 import TemplateSyntaxError
 
-from typed_jinja.config import load_config
+from typed_jinja.codes import apply_codes
+from typed_jinja.config import Config, load_config
+from typed_jinja.diagnostic import Diagnostic
 from typed_jinja.header import parse_header
+from typed_jinja.suppress import apply_suppressions
 from typed_jinja.transpile import transpile
 
 _MARKER_RE = re.compile(r'#\s*L(\d+)\s*$')
 _CACHE_DIR = Path('.typed_jinja_cache')
 
-
-@dataclass(frozen=True)
-class Diagnostic:
-    """A type error located back in the original template."""
-
-    path: Path
-    line: int
-    column: int
-    severity: str
-    message: str
-    rule: str
+__all__ = ['Diagnostic', 'PyrightNotFoundError', 'check_file', 'check_source']
 
 
 class PyrightNotFoundError(RuntimeError):
@@ -37,13 +29,28 @@ class PyrightNotFoundError(RuntimeError):
 
 
 def check_file(path: Path, cache_dir: Path = _CACHE_DIR) -> list[Diagnostic]:
-    """Type-check one template, returning diagnostics mapped to its own line numbers."""
-    source = path.read_text(encoding='utf-8')
+    """Type-check one template on disk, returning diagnostics mapped to its own lines."""
+    return check_source(path.read_text(encoding='utf-8'), path, cache_dir=cache_dir)
+
+
+def check_source(
+    source: str,
+    path: Path,
+    *,
+    cache_dir: Path = _CACHE_DIR,
+    config: Config | None = None,
+) -> list[Diagnostic]:
+    """Type-check template ``source`` labelled as ``path`` (used for on-disk and live buffers)."""
+    diags = _raw_diagnostics(source, path, cache_dir, config)
+    return apply_suppressions(source, apply_codes(diags))
+
+
+def _raw_diagnostics(source: str, path: Path, cache_dir: Path, config: Config | None) -> list[Diagnostic]:
     header = parse_header(source)
     if header is None:
         return [Diagnostic(path, 1, 1, 'warning', 'no {#def ... #} type header; skipped', 'no-header')]
     try:
-        module = transpile(source, header, load_config(Path.cwd()))
+        module = transpile(source, header, config or load_config(Path.cwd()))
     except TemplateSyntaxError as err:
         return [Diagnostic(path, err.lineno or 1, 1, 'error', f'template syntax error: {err.message}', 'syntax-error')]
     cache_dir.mkdir(parents=True, exist_ok=True)
