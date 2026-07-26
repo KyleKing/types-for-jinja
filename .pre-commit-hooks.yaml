@@ -1,0 +1,6 @@
+- id: typed-jinja
+  name: typed-jinja
+  description: Type-check Jinja2 templates against their declared {#def ... #} context
+  entry: typed-jinja check
+  language: python
+  files: \.(html|jinja)$

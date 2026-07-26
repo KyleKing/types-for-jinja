@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from typed_jinja.check import Diagnostic, check_file
+from typed_jinja.check import Diagnostic, PyrightNotFoundError, check_file
 from typed_jinja.report import format_json, format_sarif, format_text
 
 _FORMATTERS = {'text': format_text, 'json': format_json, 'sarif': format_sarif}
@@ -33,7 +33,12 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     templates = _iter_templates(args.paths)
-    diagnostics: list[Diagnostic] = [diag for template in templates for diag in check_file(template)]
+    try:
+        diagnostics: list[Diagnostic] = [diag for template in templates for diag in check_file(template)]
+    except PyrightNotFoundError:
+        message = 'typed-jinja: pyright not found on PATH; install it (for example `uv tool install pyright`)'
+        print(message, file=sys.stderr)  # ruff:ignore[print]
+        return 2
     error_count = sum(diag.severity == 'error' for diag in diagnostics)
 
     rendered = _FORMATTERS[args.format](diagnostics)

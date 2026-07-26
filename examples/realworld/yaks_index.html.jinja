@@ -1,0 +1,56 @@
+{#def
+from collections.abc import Callable
+from examples.realworld.models import YakInfo
+yak_dir_label: str
+yaks: list[YakInfo]
+total_yaks: int
+current_page: int
+total_pages: int
+categories: list[str]
+current_category: str | None
+sort_by: str
+get_category_color: Callable[[str], str]
+#}
+{% extends "base.html.jinja" %}
+
+{% block title %}Yaks in {{ yak_dir_label }}{% endblock %}
+
+{% block content %}
+  <h1>Yaks in {{ yak_dir_label }}</h1>
+  <p class="page-info">Showing {{ yaks | length }} of {{ total_yaks }} yaks (Page {{ current_page }} of {{ total_pages }})</p>
+
+  {% if categories %}
+    <div class="filter-controls">
+      {% for cat in categories | sort %}
+        <a href="/yaks?sort_by={{ sort_by }}&category={{ cat }}" class="button {% if current_category == cat %}button--primary{% endif %}">{{ cat | title }}</a>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% if yaks %}
+    <div class="cards">
+      {% for info in yaks %}
+        {% set fill = ([info.word_count, 500] | min) / 500 %}
+        <a href="/edit?yak={{ info.path }}" class="card" style="--card-accent-color: {{ get_category_color(info.category) }}; --card-fill: {{ '%.3f' | format(fill) }}">
+          <div class="card__preview">{{ info.preview }}{% if info.truncated %}…{% endif %}</div>
+          {% if info.tags %}
+            <div class="card__tags">
+              {% for tag in info.tags %}<span class="card__tag">#{{ tag }}</span>{% endfor %}
+            </div>
+          {% endif %}
+          <span class="card__chip">{{ info.category | title }}</span>
+          <span class="card__stat" title="Last modified">{{ info.last_modified[:10] }}</span>
+          <span class="card__stat" title="{{ info.link_count }} link{{ '' if info.link_count == 1 else 's' }}">⇗ {{ info.link_count }}</span>
+        </a>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% if total_pages > 1 %}
+    <div class="pagination">
+      {% for page_num in range([1, current_page - 2] | max, [total_pages + 1, current_page + 3] | min) %}
+        <a class="pagination__link {% if page_num == current_page %}pagination__link--active{% endif %}" href="/yaks?page={{ page_num }}">{{ page_num }}</a>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endblock %}

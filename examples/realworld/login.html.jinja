@@ -1,0 +1,26 @@
+{#def
+redirect: str | None
+error: str | None
+#}
+{% extends "base.html.jinja" %}
+
+{% block title %}Login to Yak-Shears{% endblock %}
+
+{% block content %}
+  <h1>Login</h1>
+  <form class="login-form" method="post" action="/auth/login" aria-label="Login form">
+    {% if redirect %}
+      <input type="hidden" name="redirect" value="{{ redirect }}">
+    {% endif %}
+    <div class="login-form__group">
+      <label class="login-form__label" for="email">Email</label>
+      <input class="login-form__control" type="email" id="email" name="email" required>
+    </div>
+    {% if error %}
+      <div class="alert alert--warn" role="alert" aria-live="polite">
+        <strong>Error:</strong> {{ error }}
+      </div>
+    {% endif %}
+    <button class="button button--primary" type="submit">Login</button>
+  </form>
+{% endblock %}

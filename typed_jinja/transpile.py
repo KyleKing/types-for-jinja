@@ -56,6 +56,10 @@ def transpile(source: str, header: TemplateHeader, config: Config | None = None)
     tree = Environment(autoescape=True).parse(source)
     param_names = {name for name, _ in header.params}
     lines: list[_Line] = [_Line(0, imp, header.lineno) for imp in [*header.imports, *config.imports]]
+    lines.extend([
+        _Line(0, 'from typing import Any as _TJAny', header.lineno),
+        _Line(0, 'def _tj_any(*args: _TJAny, **kwargs: _TJAny) -> _TJAny: ...', header.lineno),
+    ])
     lines.extend(
         _Line(0, f'{name}: {type_str}', header.lineno)
         for name, type_str in config.globals
@@ -83,7 +87,7 @@ def _emit_body(body: list[nodes.Node], out: list[_Line], indent: int) -> None:
         _emit_node(node, out, indent)
 
 
-def _emit_node(node: nodes.Node, out: list[_Line], indent: int) -> None:
+def _emit_node(node: nodes.Node, out: list[_Line], indent: int) -> None:  # ruff:ignore[complex-structure]
     match node:
         case nodes.Output():
             for child in node.nodes:
@@ -99,8 +103,12 @@ def _emit_node(node: nodes.Node, out: list[_Line], indent: int) -> None:
             _emit_body(node.body, out, indent)
         case nodes.FilterBlock():
             _emit_body(node.body, out, indent)
-        case nodes.Scope():
+        case nodes.Scope() | nodes.Block():
             _emit_body(node.body, out, indent)
+        case nodes.With():
+            _emit_with(node, out, indent)
+        case nodes.Macro() | nodes.CallBlock():
+            return
         case _:
             _emit_fallback_names(node, out, indent)
 
@@ -146,6 +154,18 @@ def _emit_assign(node: nodes.Assign, out: list[_Line], indent: int) -> None:
         _emit_fallback_names(node.node, out, indent)
         value = 'None'
     out.append(_Line(indent, f'{target} = {value}', node.lineno))
+
+
+def _emit_with(node: nodes.With, out: list[_Line], indent: int) -> None:
+    for target, value in zip(node.targets, node.values, strict=False):
+        name = _target(target)
+        try:
+            rendered = _expr(value)
+        except _UnsupportedError:
+            _emit_fallback_names(value, out, indent)
+            rendered = 'None'
+        out.append(_Line(indent, f'{name} = {rendered}', node.lineno))
+    _emit_body(node.body, out, indent)
 
 
 def _emit_expr_check(expr: nodes.Node, out: list[_Line], indent: int) -> None:
@@ -210,7 +230,9 @@ def _expr(node: nodes.Node) -> str:  # ruff:ignore[complex-structure, too-many-r
         case nodes.Filter() | nodes.Test():
             if node.node is None:
                 raise _UnsupportedError(type(node).__name__)
-            return _expr(node.node)
+            return _filtered(node)
+        case nodes.Slice():
+            return _slice(node)
         case nodes.Compare():
             return _compare(node)
         case nodes.CondExpr():
@@ -250,3 +272,20 @@ def _call(node: nodes.Call) -> str:
     args = [_expr(arg) for arg in node.args]
     args.extend(f'{kw.key}={_expr(kw.value)}' for kw in node.kwargs)
     return f'{_expr(node.node)}(' + ', '.join(args) + ')'
+
+
+def _filtered(node: nodes.Filter | nodes.Test) -> str:
+    if node.node is None:
+        raise _UnsupportedError(type(node).__name__)
+    args = [_expr(node.node)]
+    args.extend(_expr(arg) for arg in node.args)
+    args.extend(f'{kw.key}={_expr(kw.value)}' for kw in node.kwargs)
+    return '_tj_any(' + ', '.join(args) + ')'
+
+
+def _slice(node: nodes.Slice) -> str:
+    start = _expr(node.start) if node.start is not None else ''
+    stop = _expr(node.stop) if node.stop is not None else ''
+    if node.step is not None:
+        return f'{start}:{stop}:{_expr(node.step)}'
+    return f'{start}:{stop}'

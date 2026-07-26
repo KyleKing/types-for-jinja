@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from jinja2 import TemplateSyntaxError
+
 from typed_jinja.config import load_config
 from typed_jinja.header import parse_header
 from typed_jinja.transpile import transpile
@@ -39,8 +41,11 @@ def check_file(path: Path, cache_dir: Path = _CACHE_DIR) -> list[Diagnostic]:
     source = path.read_text(encoding='utf-8')
     header = parse_header(source)
     if header is None:
-        return [Diagnostic(path, 1, 0, 'warning', 'no {#def ... #} type header; skipped', 'no-header')]
-    module = transpile(source, header, load_config(Path.cwd()))
+        return [Diagnostic(path, 1, 1, 'warning', 'no {#def ... #} type header; skipped', 'no-header')]
+    try:
+        module = transpile(source, header, load_config(Path.cwd()))
+    except TemplateSyntaxError as err:
+        return [Diagnostic(path, err.lineno or 1, 1, 'error', f'template syntax error: {err.message}', 'syntax-error')]
     cache_dir.mkdir(parents=True, exist_ok=True)
     _write_pyright_config(cache_dir)
     generated = cache_dir / f'{_safe_name(path)}.py'
