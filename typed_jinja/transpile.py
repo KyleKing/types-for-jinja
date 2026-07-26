@@ -71,6 +71,7 @@ def transpile(
     lines.extend([
         _Line(0, 'from typing import Any as _TJAny', header.lineno),
         _Line(0, 'def _tj_any(*args: _TJAny, **kwargs: _TJAny) -> _TJAny: ...', header.lineno),
+        _Line(0, '_tj_loop: _TJAny', header.lineno),
     ])
     lines.extend(
         _Line(0, f'{name}: {type_str}', header.lineno)
@@ -157,10 +158,8 @@ def _emit_for(node: nodes.For, out: list[_Line], indent: int) -> None:
     target = _target(node.target)
     iterable = _iter_expr(node.iter, out, indent)
     out.append(_Line(indent, f'for {target} in {iterable}:', node.lineno))
-    inner: list[_Line] = []
+    inner: list[_Line] = [_Line(indent + 1, 'loop = _tj_loop', node.lineno)]
     _emit_body(node.body, inner, indent + 1)
-    if not inner:
-        inner.append(_Line(indent + 1, 'pass', node.lineno))
     out.extend(inner)
     if node.else_:
         out.append(_Line(indent, 'if True:', node.lineno))
