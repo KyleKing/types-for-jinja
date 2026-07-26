@@ -139,7 +139,11 @@ it, and runtime enforcement is a separate opt-in.
 Two delivery options for Level 2, ship (a) first:
 
 - **(a) Decorate the generated wrappers.** Reuse beartype or Pydantic as-is. No new
-  runtime engine to build.
+  runtime engine to build. Built as a working proof in `examples/runtime`:
+  `typed_jinja.wrapper.generate_wrapper(header, name, validator=...)` emits the typed
+  function, and `validator='beartype'` decorates it while `validator='pydantic'`
+  validates each parameter through a `TypeAdapter` before rendering. Tests confirm
+  beartype raises on a wrong type and Pydantic coerces a dict then rejects a bad one.
 - **(b) A `TypedEnvironment(jinja2.Environment)`** whose `.render()` reads the header,
   resolves the declared types by evaluating the annotation strings in the header's
   import namespace (the way `get_type_hints` does), validates the context, then
@@ -221,6 +225,16 @@ beartype, or Pydantic).
 v1 is a checker that is quiet (globals), scriptable (JSON/SARIF), and drops into CI
 (CLI/pre-commit).
 
+### Status (current build)
+
+- Shipped: the checker (undefined variables plus attribute and item access), the CLI
+  with `--format text|json|sarif`, and the Environment globals declaration.
+- Shipped as a working proof (ahead of its v1.1 slot): the Level-1 typed wrapper with
+  Level-2 beartype and Pydantic enforcement in `examples/runtime`, so the runtime story
+  is verified before yak-shears adoption.
+- In progress: the LSP spike with Neovim integration, and v1 hardening (a pre-commit
+  hook, template-syntax and missing-pyright handling, broader Jinja node coverage).
+
 ## Scope
 
 **v1:**
@@ -234,8 +248,10 @@ v1 is a checker that is quiet (globals), scriptable (JSON/SARIF), and drops into
 - CLI `typed-jinja check <paths>` with non-zero exit on errors
 
 **Deferred to v1.1+ (explicit non-goals for now):**
-- LSP / editor diagnostics
-- Typed wrapper codegen (Level 1) and the runtime enforcement layer (Level 2)
+- LSP / editor diagnostics (spike in progress)
+- Productizing the typed wrapper codegen (Level 1) and runtime enforcement (Level 2)
+  into the CLI and a documented workflow. The mechanism is proven in `examples/runtime`;
+  what remains is wiring, not feasibility.
 - Extension-tag declaration (rung 2)
 - Framework adapters (Flask, Django-Jinja2, FastAPI) that locate "this view renders
   this template with this context"

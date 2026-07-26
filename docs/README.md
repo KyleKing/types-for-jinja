@@ -1,30 +1,73 @@
 # typed-jinja
 
-Static type checker for Jinja2 templates via codegen and pyright
+Type-check your Jinja2 templates. It is mypy for the context you pass to a template.
+
+## The problem
+
+The variables you hand a Jinja template are untyped. Rename a model field, mistype an
+attribute, or forget to pass a variable, and nothing tells you until the template
+renders, often in production. typed-jinja closes that gap without a new template language
+and without changing how Jinja renders. You declare the context once, in a comment, and a
+type checker validates every variable and attribute the template touches.
+
+## 30-second example
+
+```jinja
+{#def
+from myapp.models import User
+user: User
+#}
+<h1>Hello {{ user.naem }}</h1>
+{% for item in user.items %}
+  <li>{{ item.titel }}</li>
+{% endfor %}
+```
+
+```console
+$ typed-jinja check templates/
+templates/greeting.html:5:14 error: Cannot access attribute "naem" for class "User" (reportAttributeAccessIssue)
+templates/greeting.html:8:14 error: Cannot access attribute "titel" for class "Item" (reportAttributeAccessIssue)
+```
+
+The `{#def #}` block is a plain Jinja comment, so the template renders exactly as before.
+The loop variable is narrowed to its element type, so `item.titel` is caught too.
 
 ## Installation
 
-1. `poetry add typed_jinja`
+```console
+uv add typed-jinja      # or: pip install typed-jinja
+```
 
-1. ...
+typed-jinja calls [pyright](https://github.com/microsoft/pyright) for the type inference,
+so pyright needs to be on your PATH.
 
-    ```sh
-    import typed_jinja
+## How it works
 
-    # TODO: [Replace with your example code]
-    ```
+typed-jinja parses the template with Jinja's own parser, transpiles it into a small Python
+stub that exercises every expression, and runs pyright over that stub. Errors map back to
+the template's own line and column. The stub is thrown away and Jinja renders the real
+template unchanged, so there is no runtime cost and nothing to migrate beyond the one-line
+header. Declare Environment globals (such as `static_url`) once under `[tool.typed_jinja]`
+in `pyproject.toml` so the checker treats them as defined.
 
-1. ...
+## Runtime checking (optional)
 
-## Usage
+Static checking is the default and costs nothing at runtime. To also validate the context
+at render time, typed-jinja can generate a typed wrapper and enforce the types with
+[beartype](https://github.com/beartype/beartype) (check) or
+[Pydantic](https://github.com/pydantic/pydantic) (parse and coerce). Both work whether
+your context types are dataclasses or Pydantic models. A runnable proof lives in
+`examples/runtime`.
 
-<!-- TODO: [Add screenshots or terminal recording demonstrating usage] -->
+## CI and agents
 
-For more example code, see the [scripts] directory or the [tests].
+`typed-jinja check --format json` and `--format sarif` emit machine-readable output. The
+SARIF report plugs into GitHub code scanning and coding agents.
 
 ## Project Status
 
-See the `Open Issues` and/or the [CODE_TAG_SUMMARY]. For release history, see the [CHANGELOG].
+Early and moving. See [PLAN] for the architecture, roadmap, and design decisions, plus the
+`Open Issues` and the [CODE_TAG_SUMMARY]. For release history, see the [CHANGELOG].
 
 ## Contributing
 
@@ -54,6 +97,6 @@ If you have any security issue to report, please contact the project maintainers
 [contributor-covenant]: https://www.contributor-covenant.org
 [developer_guide]: https://typed-jinja.kyleking.me/docs/DEVELOPER_GUIDE
 [license]: https://github.com/kyleking/typed-jinja/blob/main/LICENSE
-[scripts]: https://github.com/kyleking/typed-jinja/blob/main/scripts
+[plan]: https://github.com/kyleking/typed-jinja/blob/main/PLAN.md
 [style_guide]: https://typed-jinja.kyleking.me/docs/STYLE_GUIDE
 [tests]: https://github.com/kyleking/typed-jinja/blob/main/tests
