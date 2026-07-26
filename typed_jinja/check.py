@@ -54,6 +54,7 @@ def _raw_diagnostics(source: str, path: Path, cache_dir: Path, config: Config | 
     except TemplateSyntaxError as err:
         return [Diagnostic(path, err.lineno or 1, 1, 'error', f'template syntax error: {err.message}', 'syntax-error')]
     cache_dir.mkdir(parents=True, exist_ok=True)
+    _write_cache_gitignore(cache_dir)
     _write_pyright_config(cache_dir)
     generated = cache_dir / f'{_safe_name(path)}.py'
     generated.write_text(module.code, encoding='utf-8')
@@ -74,6 +75,13 @@ def _raw_diagnostics(source: str, path: Path, cache_dir: Path, config: Config | 
 
 def _safe_name(path: Path) -> str:
     return re.sub(r'[^0-9A-Za-z]+', '_', str(path)).strip('_')
+
+
+def _write_cache_gitignore(cache_dir: Path) -> None:
+    """Make the cache self-ignoring so consuming repos never have to gitignore it."""
+    marker = cache_dir / '.gitignore'
+    if not marker.is_file():
+        marker.write_text('*\n', encoding='utf-8')
 
 
 def _write_pyright_config(cache_dir: Path) -> None:
