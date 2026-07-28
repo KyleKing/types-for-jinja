@@ -30,7 +30,7 @@ license = "MIT"
 maintainers = []
 name = "typed_jinja"
 readme = "docs/README.md"
-requires-python = ">=3.11.11"
+requires-python = ">=3.11.9"
 version = "0.0.1"
 
 [project.optional-dependencies]
