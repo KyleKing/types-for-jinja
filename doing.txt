@@ -1,0 +1,2 @@
+See discussion about beartype/pydantic screenshot
+Finish initial implementation, publish to GitHub, to PyPi, use in Yak-Shears?

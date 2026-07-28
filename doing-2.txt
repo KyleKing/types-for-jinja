@@ -1,0 +1,31 @@
+- I thought yak-shears could be simplified because I had already built some sort of dataclass/pydantic wrapper layer?
+- Publish after verifying CI
+
+## 2026-07-27 - yak-shears DRY opportunity (confirmed, not acted on)
+
+The hunch above checks out. Both projects already agree on the `{#def ... #}` header
+syntax: `typed_jinja/header.py` parses it, and all 11 templates in
+`yak_shears/_templates/` already carry one declaring imports and typed params.
+
+yak-shears then hand-writes seven `render_*` functions in
+`yak_shears/_templates/__init__.py` (render_error, render_auth_login, render_yaks,
+render_new, render_yak_edit, render_settings, render_search). Each restates the
+parameter list that its template's header already declares, calls
+`ENV.get_template(name).render(...)`, and wraps the result. That is the same
+function body `generate_wrapper` in `typed_jinja/wrapper.py` emits, so the
+signatures are duplicated by hand and can drift from the headers with nothing
+catching it.
+
+What blocks a straight swap:
+
+- `generate_wrapper` returns `Markup`; every yak-shears helper returns
+  `starlette.responses.HTMLResponse`, and `render_error` also sets an
+  `HTTPStatus`. A return-type or wrapper-call option would close this
+- some helpers do real work before rendering (deriving sort links, palette lookups,
+  pagination), so they would keep a hand-written body that calls the generated
+  function rather than being replaced by it
+- `env_import` already covers pointing the generated module at `yak_shears._templates.ENV`
+
+Worth deciding whether typed-jinja grows a "wrap the render in a caller-supplied
+callable" option, or whether yak-shears keeps its helpers and only generates the
+inner typed render. Either way the parameter lists stop being written twice.
