@@ -1,12 +1,11 @@
 """Conditionally configure runtime typechecking."""
 
 from contextlib import suppress
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from os import getenv
+from typing import Self
 from warnings import filterwarnings
-
-from typing_extensions import Self
 
 NAME = 'typed_jinja'.upper()
 """Package name to allow more targeted usage."""
@@ -43,9 +42,9 @@ def configure_runtime_type_checking_mode() -> None:  # pragma: no cover
     if rtc_mode is not _RuntimeTypeCheckingModes.OFF:
         with suppress(ImportError, ModuleNotFoundError):
             # Requires beartype >=0.15.0 and Python >= 3.8
-            from beartype import BeartypeConf  # noqa: PLC0415
-            from beartype.claw import beartype_this_package  # noqa: PLC0415
-            from beartype.roar import BeartypeClawDecorWarning  # noqa: PLC0415
+            from beartype import BeartypeConf  # ruff:ignore[import-outside-top-level]
+            from beartype.claw import beartype_this_package  # ruff:ignore[import-outside-top-level]
+            from beartype.roar import BeartypeClawDecorWarning  # ruff:ignore[import-outside-top-level]
 
             beartype_this_package(
                 conf=BeartypeConf(
@@ -57,7 +56,7 @@ def configure_runtime_type_checking_mode() -> None:  # pragma: no cover
 
 
 _PEP585_DATE = 2025
-if datetime.now(tz=timezone.utc).year <= _PEP585_DATE:  # pragma: no cover
+if datetime.now(tz=UTC).year <= _PEP585_DATE:  # pragma: no cover
     with suppress(ImportError, ModuleNotFoundError):
         from beartype.roar import BeartypeDecorHintPep585DeprecationWarning
 
