@@ -12,11 +12,12 @@ pydantic and pygls.
 
 Two things to settle before publishing to PyPI:
 
-- the CI test matrix asks for Python "3.11", which resolves to 3.11.9, while
-  `requires-python` is `>=3.11.11`. uv refuses the interpreter and the job dies in
-  setup. Either loosen `requires-python` or pin the matrix entry to a version that
-  satisfies it. macOS failed and Windows was cancelled by fail-fast, so neither
-  platform has actually run the suite yet
+- DONE, committed locally and NOT pushed: the CI test matrix asks for Python
+  "3.11", which resolves to 3.11.9, while `requires-python` was `>=3.11.11`. uv
+  refused the interpreter and the job died in setup. Lowered the floor to
+  `>=3.11.9` in pyproject.toml, with the matching one-line `uv lock` update. macOS
+  failed and Windows was cancelled by fail-fast, so neither platform has run the
+  suite on a runner yet. Pushing this is what proves it
 - mypy reports 13 errors across 6 files, all in `tests/`. Some look deliberate
   (test_wrapper passes a `str` and a `dict` where a `Profile` is expected, which is
   presumably the point of a runtime-validation test) and want a targeted
