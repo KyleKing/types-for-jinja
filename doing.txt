@@ -1,2 +1,28 @@
 See discussion about beartype/pydantic screenshot
 Finish initial implementation, publish to GitHub, to PyPi, use in Yak-Shears?
+
+## 2026-07-27 - published to GitHub, CI is red on two counts
+
+Pushed 20 commits to github.com/KyleKing/typed-jinja (was an empty public repo).
+Nothing reached PyPI: the publish workflow's `build` job ran, and
+`publish-testpypi`, `publish-pypi`, and `create-release` are tag-gated and all
+skipped. Locally the suite is healthy, 51 passed, once `uv sync --all-extras` is
+run. Without the extras, test_lsp and test_wrapper fail collection on missing
+pydantic and pygls.
+
+Two things to settle before publishing to PyPI:
+
+- the CI test matrix asks for Python "3.11", which resolves to 3.11.9, while
+  `requires-python` is `>=3.11.11`. uv refuses the interpreter and the job dies in
+  setup. Either loosen `requires-python` or pin the matrix entry to a version that
+  satisfies it. macOS failed and Windows was cancelled by fail-fast, so neither
+  platform has actually run the suite yet
+- mypy reports 13 errors across 6 files, all in `tests/`. Some look deliberate
+  (test_wrapper passes a `str` and a `dict` where a `Profile` is expected, which is
+  presumably the point of a runtime-validation test) and want a targeted
+  `# type: ignore` with a reason. The rest look real: `transpile` is called with
+  `TemplateHeader | None` in four tests where it expects `TemplateHeader`,
+  test_lsp assigns over a method twice, and test_v1_robustness reaches for
+  `typed_jinja.check.shutil`, which is not exported
+
+The lint job passes.
