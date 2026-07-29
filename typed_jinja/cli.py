@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from typed_jinja.check import Diagnostic, PyrightNotFoundError, check_file
+from typed_jinja.generate import generate, stale, write
 from typed_jinja.report import format_json, format_sarif, format_text
 
 _FORMATTERS = {'text': format_text, 'json': format_json, 'sarif': format_sarif}
@@ -23,6 +24,24 @@ def _iter_templates(paths: list[Path]) -> list[Path]:
     return found
 
 
+def _generate(templates: list[Path], out_dir: Path, *, check_only: bool) -> int:
+    generated = generate(templates, out_dir)
+    for template, reason in generated.skipped:
+        print(f'typed-jinja: skipped {template}: {reason}', file=sys.stderr)  # ruff:ignore[print]
+    for template in generated.unaligned:
+        message = f'typed-jinja: {template} has no line-aligned form; its stub uses # L markers instead'
+        print(message, file=sys.stderr)  # ruff:ignore[print]
+    if check_only:
+        outdated = stale(generated)
+        for path in outdated:
+            print(f'typed-jinja: out of date: {path}', file=sys.stderr)  # ruff:ignore[print]
+        return 1 if outdated else 0
+    changed = write(generated, out_dir)
+    summary = f'Wrote {len(changed)} of {len(generated.files)} stub(s) for {len(generated.stubs)} template(s)'
+    print(summary, file=sys.stderr)  # ruff:ignore[print]
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Run the checker over the given paths; return a non-zero exit code on errors."""
     parser = argparse.ArgumentParser(prog='typed-jinja')
@@ -30,9 +49,28 @@ def main(argv: list[str] | None = None) -> int:
     check_parser = subparsers.add_parser('check', help='type-check Jinja templates')
     check_parser.add_argument('paths', nargs='+', type=Path, help='template files or directories')
     check_parser.add_argument('--format', choices=list(_FORMATTERS), default='text', help='output format')
+    generate_parser = subparsers.add_parser(
+        'generate',
+        help='write type-checking stubs for your own type checker to pick up',
+    )
+    generate_parser.add_argument('paths', nargs='+', type=Path, help='template files or directories')
+    generate_parser.add_argument(
+        '-o',
+        '--out-dir',
+        type=Path,
+        default=Path('_jinja_stubs'),
+        help='output directory; must not start with a dot, which pyright excludes by default',
+    )
+    generate_parser.add_argument(
+        '--check',
+        action='store_true',
+        help='exit non-zero if any stub is missing or out of date instead of writing',
+    )
     args = parser.parse_args(argv)
 
     templates = _iter_templates(args.paths)
+    if args.command == 'generate':
+        return _generate(templates, args.out_dir, check_only=args.check)
     try:
         diagnostics: list[Diagnostic] = [diag for template in templates for diag in check_file(template)]
     except PyrightNotFoundError:
