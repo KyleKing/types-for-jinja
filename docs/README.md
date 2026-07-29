@@ -4,11 +4,7 @@ Type-check your Jinja2 templates. It is mypy for the context you pass to a templ
 
 ## The problem
 
-The variables you hand a Jinja template are untyped. Rename a model field, mistype an
-attribute, or forget to pass a variable, and nothing tells you until the template
-renders, often in production. typed-jinja closes that gap without a new template language
-and without changing how Jinja renders. You declare the context once, in a comment, and a
-type checker validates every variable and attribute the template touches.
+The variables you hand a Jinja template are untyped. Rename a model field, mistype an attribute, or forget to pass a variable, and nothing tells you until the template renders, often in production. typed-jinja closes that gap without a new template language and without changing how Jinja renders. You declare the context once, in a comment, and a type checker validates every variable and attribute the template touches.
 
 ## 30-second example
 
@@ -29,8 +25,7 @@ templates/greeting.html:5:14 error: Cannot access attribute "naem" for class "Us
 templates/greeting.html:8:14 error: Cannot access attribute "titel" for class "Item" (reportAttributeAccessIssue)
 ```
 
-The `{#def #}` block is a plain Jinja comment, so the template renders exactly as before.
-The loop variable is narrowed to its element type, so `item.titel` is caught too.
+The `{#def #}` block is a plain Jinja comment, so the template renders exactly as before. The loop variable is narrowed to its element type, so `item.titel` is caught too.
 
 ## Installation
 
@@ -38,36 +33,23 @@ The loop variable is narrowed to its element type, so `item.titel` is caught too
 uv add typed-jinja      # or: pip install typed-jinja
 ```
 
-typed-jinja calls [pyright](https://github.com/microsoft/pyright) for the type inference,
-so pyright needs to be on your PATH.
+typed-jinja calls [pyright](https://github.com/microsoft/pyright) for the type inference, so pyright needs to be on your PATH.
 
 ## How it works
 
-typed-jinja parses the template with Jinja's own parser, transpiles it into a small Python
-stub that exercises every expression, and runs pyright over that stub. Errors map back to
-the template's own line and column. The stub is thrown away and Jinja renders the real
-template unchanged, so there is no runtime cost and nothing to migrate beyond the one-line
-header. Declare Environment globals (such as `static_url`) once under `[tool.typed_jinja]`
-in `pyproject.toml` so the checker treats them as defined.
+typed-jinja parses the template with Jinja's own parser, transpiles it into a small Python stub that exercises every expression, and runs pyright over that stub. Errors map back to the template's own line and column. The stub is thrown away and Jinja renders the real template unchanged, so there is no runtime cost and nothing to migrate beyond the one-line header. Declare Environment globals (such as `static_url`) once under `[tool.typed_jinja]` in `pyproject.toml` so the checker treats them as defined.
 
 ## Runtime checking (optional)
 
-Static checking is the default and costs nothing at runtime. To also validate the context
-at render time, typed-jinja can generate a typed wrapper and enforce the types with
-[beartype](https://github.com/beartype/beartype) (check) or
-[Pydantic](https://github.com/pydantic/pydantic) (parse and coerce). Both work whether
-your context types are dataclasses or Pydantic models. A runnable proof lives in
-`examples/runtime`.
+Static checking is the default and costs nothing at runtime. To also validate the context at render time, typed-jinja can generate a typed wrapper and enforce the types with [beartype](https://github.com/beartype/beartype) (check) or [Pydantic](https://github.com/pydantic/pydantic) (parse and coerce). Both work whether your context types are dataclasses or Pydantic models. A runnable proof lives in `examples/runtime`.
 
 ## CI and agents
 
-`typed-jinja check --format json` and `--format sarif` emit machine-readable output. The
-SARIF report plugs into GitHub code scanning and coding agents.
+`typed-jinja check --format json` and `--format sarif` emit machine-readable output. The SARIF report plugs into GitHub code scanning and coding agents.
 
 ## Project Status
 
-Early and moving. See [PLAN] for the architecture, roadmap, and design decisions, plus the
-`Open Issues` and the [CODE_TAG_SUMMARY]. For release history, see the [CHANGELOG].
+Early and moving. See [PLAN] for the architecture, roadmap, and design decisions, plus the `Open Issues` and the [CODE_TAG_SUMMARY]. For release history, see the [CHANGELOG].
 
 ## Contributing
 
@@ -99,4 +81,3 @@ If you have any security issue to report, please contact the project maintainers
 [license]: https://github.com/kyleking/typed-jinja/blob/main/LICENSE
 [plan]: https://github.com/kyleking/typed-jinja/blob/main/PLAN.md
 [style_guide]: https://typed-jinja.kyleking.me/docs/STYLE_GUIDE
-[tests]: https://github.com/kyleking/typed-jinja/blob/main/tests

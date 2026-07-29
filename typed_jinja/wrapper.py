@@ -48,10 +48,12 @@ def generate_wrapper(
     lines.extend(['', ''])
     if validator == 'beartype':
         lines.append('@beartype')
-    lines.extend([
-        f'def render_{name}(*, {signature}) -> Markup:',
-        f'    """Render {template_name} with a checked context."""',
-    ])
+    lines.extend(
+        [
+            f'def render_{name}(*, {signature}) -> Markup:',
+            f'    """Render {template_name} with a checked context."""',
+        ]
+    )
     if validator == 'pydantic':
         lines.extend(
             f'    {param} = _ta_{param}.validate_python({param})  # validate and transform'

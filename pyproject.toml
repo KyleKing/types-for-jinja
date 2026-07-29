@@ -58,7 +58,7 @@ check_untyped_defs = true
 disallow_any_generics = true
 enable_error_code = ["ignore-without-code", "possibly-undefined", "redundant-expr", "truthy-bool"]
 extra_checks = true
-files = ["typed_jinja", "tests"]
+files = ["tests", "typed_jinja"]
 no_implicit_reexport = true
 plugins = [
 ]
@@ -73,7 +73,7 @@ warn_unused_configs = true
 warn_unused_ignores = true
 
 [tool.pyright]
-include = ["typed_jinja", "tests"]
+include = ["tests", "typed_jinja"]
 pythonVersion = "3.11"
 
 [tool.ruff]
