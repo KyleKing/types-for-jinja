@@ -9,7 +9,7 @@ line carries a ``# L<n>`` marker back to its source line in the template.
 from __future__ import annotations
 
 import keyword
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from jinja2 import Environment, TemplateSyntaxError, nodes
@@ -40,10 +40,13 @@ class _UnsupportedError(Exception):
 
 
 @dataclass
-class _Line:
+class Line:
+    """One emitted stub statement and the template line it checks."""
+
     indent: int
     text: str
     lineno: int
+    foreign: bool = False
 
 
 @dataclass
@@ -52,6 +55,8 @@ class GeneratedModule:
 
     code: str
     param_names: list[str] = field(default_factory=list)
+    lines: list[Line] = field(default_factory=list)
+    preamble_len: int = 0
 
 
 def transpile(
@@ -73,45 +78,60 @@ def transpile(
     search_dirs = _search_dirs(template_path, config)
     param_names = {name for name, _ in header.params}
 
-    lines: list[_Line] = [_Line(0, imp, header.lineno) for imp in [*header.imports, *config.imports]]
+    lines: list[Line] = [Line(0, imp, header.lineno) for imp in [*header.imports, *config.imports]]
     lines.extend(
         [
-            _Line(0, 'from typing import Any as _TJAny', header.lineno),
-            _Line(0, 'def _tj_any(*args: _TJAny, **kwargs: _TJAny) -> _TJAny: ...', header.lineno),
-            _Line(0, '_tj_loop: _TJAny', header.lineno),
+            Line(0, 'from typing import Any as _TJAny', header.lineno),
+            Line(0, 'def _tj_any(*args: _TJAny, **kwargs: _TJAny) -> _TJAny: ...', header.lineno),
+            Line(0, '_tj_loop: _TJAny', header.lineno),
         ]
     )
     lines.extend(
-        _Line(0, f'{name}: {type_str}', header.lineno) for name, type_str in config.globals if name not in param_names
+        Line(0, f'{name}: {type_str}', header.lineno) for name, type_str in config.globals if name not in param_names
     )
 
-    module_defs: list[_Line] = []
+    preamble_len = len(lines)
+    module_defs: list[Line] = []
     render_nodes: list[nodes.Node] = []
     base_nodes: list[nodes.Node] = []
+    foreign_defs: list[Line] = []
     for node in tree.body:
         match node:
             case nodes.Macro():
                 _emit_macro(node, module_defs)
             case nodes.Extends():
-                base_nodes.extend(_load_base_nodes(node, search_dirs, module_defs, env))
+                base_nodes.extend(_load_base_nodes(node, search_dirs, foreign_defs, env))
             case nodes.FromImport():
-                _emit_from_import(node, search_dirs, module_defs, env)
+                _emit_from_import(node, search_dirs, foreign_defs, env)
             case nodes.Import():
-                _emit_import(node, search_dirs, module_defs, env)
+                _emit_import(node, search_dirs, foreign_defs, env)
             case _:
                 render_nodes.append(node)
+    lines.extend(_mark_foreign(foreign_defs))
     lines.extend(module_defs)
 
     signature = ', '.join(f'{name}: {type_str}' for name, type_str in header.params)
-    lines.append(_Line(0, f'def _render({signature}) -> None:', header.lineno))
-    body: list[_Line] = []
+    lines.append(Line(0, f'def _render({signature}) -> None:', header.lineno))
+    body: list[Line] = []
     _emit_body(render_nodes, body, 1)
-    _emit_body(base_nodes, body, 1)
+    inherited: list[Line] = []
+    _emit_body(base_nodes, inherited, 1)
+    body.extend(_mark_foreign(inherited))
     if not body:
-        body.append(_Line(1, 'pass', header.lineno))
+        body.append(Line(1, 'pass', header.lineno))
     lines.extend(body)
     code = '\n'.join(_render_line(line) for line in lines) + '\n'
-    return GeneratedModule(code=code, param_names=[name for name, _ in header.params])
+    return GeneratedModule(
+        code=code,
+        param_names=[name for name, _ in header.params],
+        lines=lines,
+        preamble_len=preamble_len,
+    )
+
+
+def _mark_foreign(lines: list[Line]) -> list[Line]:
+    """Flag lines whose ``lineno`` belongs to another template, not the one being checked."""
+    return [replace(line, foreign=True) for line in lines]
 
 
 def _search_dirs(template_path: Path | None, config: Config) -> list[Path]:
@@ -120,18 +140,18 @@ def _search_dirs(template_path: Path | None, config: Config) -> list[Path]:
     return dirs
 
 
-def _render_line(line: _Line) -> str:
+def _render_line(line: Line) -> str:
     prefix = '    ' * line.indent
     marker = f'  # L{line.lineno}' if line.lineno else ''
     return f'{prefix}{line.text}{marker}'
 
 
-def _emit_body(body: list[nodes.Node], out: list[_Line], indent: int) -> None:
+def _emit_body(body: list[nodes.Node], out: list[Line], indent: int) -> None:
     for node in body:
         _emit_node(node, out, indent)
 
 
-def _emit_node(node: nodes.Node, out: list[_Line], indent: int) -> None:  # ruff:ignore[complex-structure, too-many-branches]
+def _emit_node(node: nodes.Node, out: list[Line], indent: int) -> None:  # ruff:ignore[complex-structure, too-many-branches]
     match node:
         case nodes.Output():
             for child in node.nodes:
@@ -160,48 +180,48 @@ def _emit_node(node: nodes.Node, out: list[_Line], indent: int) -> None:  # ruff
             _emit_fallback_names(node, out, indent)
 
 
-def _emit_for(node: nodes.For, out: list[_Line], indent: int) -> None:
+def _emit_for(node: nodes.For, out: list[Line], indent: int) -> None:
     target = _target(node.target)
     iterable = _iter_expr(node.iter, out, indent)
-    out.append(_Line(indent, f'for {target} in {iterable}:', node.lineno))
-    inner: list[_Line] = [_Line(indent + 1, 'loop = _tj_loop', node.lineno)]
+    out.append(Line(indent, f'for {target} in {iterable}:', node.lineno))
+    inner: list[Line] = [Line(indent + 1, 'loop = _tj_loop', node.lineno)]
     _emit_body(node.body, inner, indent + 1)
     out.extend(inner)
     if node.else_:
-        out.append(_Line(indent, 'if True:', node.lineno))
+        out.append(Line(indent, 'if True:', node.lineno))
         _emit_body(node.else_, out, indent + 1)
 
 
-def _emit_if(node: nodes.If, out: list[_Line], indent: int) -> None:
-    out.append(_Line(indent, f'if {_cond(node.test, out, indent)}:', node.lineno))
+def _emit_if(node: nodes.If, out: list[Line], indent: int) -> None:
+    out.append(Line(indent, f'if {_cond(node.test, out, indent)}:', node.lineno))
     _emit_block(node.body, out, indent, node.lineno)
     for elif_node in node.elif_:
-        out.append(_Line(indent, f'elif {_cond(elif_node.test, out, indent)}:', elif_node.lineno))
+        out.append(Line(indent, f'elif {_cond(elif_node.test, out, indent)}:', elif_node.lineno))
         _emit_block(elif_node.body, out, indent, elif_node.lineno)
     if node.else_:
-        out.append(_Line(indent, 'else:', node.lineno))
+        out.append(Line(indent, 'else:', node.lineno))
         _emit_block(node.else_, out, indent, node.lineno)
 
 
-def _emit_block(body: list[nodes.Node], out: list[_Line], indent: int, lineno: int) -> None:
-    inner: list[_Line] = []
+def _emit_block(body: list[nodes.Node], out: list[Line], indent: int, lineno: int) -> None:
+    inner: list[Line] = []
     _emit_body(body, inner, indent + 1)
     if not inner:
-        inner.append(_Line(indent + 1, 'pass', lineno))
+        inner.append(Line(indent + 1, 'pass', lineno))
     out.extend(inner)
 
 
-def _emit_assign(node: nodes.Assign, out: list[_Line], indent: int) -> None:
+def _emit_assign(node: nodes.Assign, out: list[Line], indent: int) -> None:
     target = _target(node.target)
     try:
         value = _expr(node.node)
     except _UnsupportedError:
         _emit_fallback_names(node.node, out, indent)
         value = 'None'
-    out.append(_Line(indent, f'{target} = {value}', node.lineno))
+    out.append(Line(indent, f'{target} = {value}', node.lineno))
 
 
-def _emit_with(node: nodes.With, out: list[_Line], indent: int) -> None:
+def _emit_with(node: nodes.With, out: list[Line], indent: int) -> None:
     for target, value in zip(node.targets, node.values, strict=False):
         name = _target(target)
         try:
@@ -209,7 +229,7 @@ def _emit_with(node: nodes.With, out: list[_Line], indent: int) -> None:
         except _UnsupportedError:
             _emit_fallback_names(value, out, indent)
             rendered = 'None'
-        out.append(_Line(indent, f'{name} = {rendered}', node.lineno))
+        out.append(Line(indent, f'{name} = {rendered}', node.lineno))
     _emit_body(node.body, out, indent)
 
 
@@ -220,20 +240,20 @@ def _macro_params(node: nodes.Macro) -> str:
     )
 
 
-def _emit_macro(node: nodes.Macro, out: list[_Line], *, indent: int = 0, alias: str | None = None) -> None:
+def _emit_macro(node: nodes.Macro, out: list[Line], *, indent: int = 0, alias: str | None = None) -> None:
     name = alias or node.name
     signature = _macro_params(node)
-    out.append(_Line(indent, f'def {name}({signature}) -> _TJAny:', node.lineno))
-    inner: list[_Line] = []
+    out.append(Line(indent, f'def {name}({signature}) -> _TJAny:', node.lineno))
+    inner: list[Line] = []
     _emit_body(node.body, inner, indent + 1)
     if not inner:
-        inner.append(_Line(indent + 1, 'pass', node.lineno))
+        inner.append(Line(indent + 1, 'pass', node.lineno))
     out.extend(inner)
 
 
-def _emit_macro_stub(node: nodes.Macro, out: list[_Line], indent: int, *, alias: str | None = None) -> None:
+def _emit_macro_stub(node: nodes.Macro, out: list[Line], indent: int, *, alias: str | None = None) -> None:
     name = alias or node.name
-    out.append(_Line(indent, f'def {name}({_macro_params(node)}) -> _TJAny: ...', node.lineno))
+    out.append(Line(indent, f'def {name}({_macro_params(node)}) -> _TJAny: ...', node.lineno))
 
 
 def _const_str(node: nodes.Node) -> str | None:
@@ -257,7 +277,7 @@ def _load_macros(template: nodes.Node, search_dirs: list[Path], env: Environment
 def _load_base_nodes(
     node: nodes.Extends,
     search_dirs: list[Path],
-    module_defs: list[_Line],
+    module_defs: list[Line],
     env: Environment,
 ) -> list[nodes.Node]:
     ref = _const_str(node.template)
@@ -282,7 +302,7 @@ def _load_base_nodes(
 def _emit_from_import(
     node: nodes.FromImport,
     search_dirs: list[Path],
-    module_defs: list[_Line],
+    module_defs: list[Line],
     env: Environment,
 ) -> None:
     macros = _load_macros(node.template, search_dirs, env)
@@ -298,46 +318,46 @@ def _emit_from_import(
 def _emit_import(
     node: nodes.Import,
     search_dirs: list[Path],
-    module_defs: list[_Line],
+    module_defs: list[Line],
     env: Environment,
 ) -> None:
     macros = _load_macros(node.template, search_dirs, env)
     if macros is None:
         return
     cls = f'_TJNS_{node.target}'
-    module_defs.append(_Line(0, f'class {cls}:', node.lineno))
+    module_defs.append(Line(0, f'class {cls}:', node.lineno))
     if not macros:
-        module_defs.append(_Line(1, 'pass', node.lineno))
+        module_defs.append(Line(1, 'pass', node.lineno))
     for macro in macros.values():
-        module_defs.append(_Line(1, '@staticmethod', macro.lineno))
+        module_defs.append(Line(1, '@staticmethod', macro.lineno))
         _emit_macro_stub(macro, module_defs, 1)
-    module_defs.append(_Line(0, f'{node.target} = {cls}', node.lineno))
+    module_defs.append(Line(0, f'{node.target} = {cls}', node.lineno))
 
 
-def _emit_expr_check(expr: nodes.Node, out: list[_Line], indent: int) -> None:
+def _emit_expr_check(expr: nodes.Node, out: list[Line], indent: int) -> None:
     try:
         rendered = _expr(expr)
     except _UnsupportedError:
         _emit_fallback_names(expr, out, indent)
         return
-    out.append(_Line(indent, f'_ = {rendered}', expr.lineno))
+    out.append(Line(indent, f'_ = {rendered}', expr.lineno))
 
 
-def _emit_fallback_names(node: nodes.Node, out: list[_Line], indent: int) -> None:
+def _emit_fallback_names(node: nodes.Node, out: list[Line], indent: int) -> None:
     for attr in node.find_all(nodes.Getattr):
         try:
             rendered = _expr(attr)
         except _UnsupportedError:
             continue
-        out.append(_Line(indent, f'_ = {rendered}', attr.lineno))
+        out.append(Line(indent, f'_ = {rendered}', attr.lineno))
     out.extend(
-        _Line(indent, f'_ = {_ident(name.name)}', name.lineno)
+        Line(indent, f'_ = {_ident(name.name)}', name.lineno)
         for name in node.find_all(nodes.Name)
         if name.ctx == 'load'
     )
 
 
-def _cond(node: nodes.Node, out: list[_Line], indent: int) -> str:
+def _cond(node: nodes.Node, out: list[Line], indent: int) -> str:
     try:
         return _expr(node)
     except _UnsupportedError:
@@ -345,7 +365,7 @@ def _cond(node: nodes.Node, out: list[_Line], indent: int) -> str:
         return 'True'
 
 
-def _iter_expr(node: nodes.Node, out: list[_Line], indent: int) -> str:
+def _iter_expr(node: nodes.Node, out: list[Line], indent: int) -> str:
     try:
         return _expr(node)
     except _UnsupportedError:
