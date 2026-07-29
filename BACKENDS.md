@@ -1,14 +1,16 @@
 # Checker backends and batching
 
-Parked design notes from 2026-07-29. Nothing here is implemented. Current work is on
-transpilation, so this exists so the measurements do not have to be redone.
+Parked design notes from 2026-07-29. The backend and batching work below is unimplemented;
+`typed_jinja/layout.py` and `typed_jinja/generate.py` are the part that shipped. This exists
+so the measurements do not have to be redone.
 
 Measured with pyright 1.1.411 (mise pipx), ty 0.0.61, and mypy 2.3.0 on macOS.
 
 ## Why typed-jinja runs the checker itself
 
-Worth settling first, because it rules out the "let users bring their own checker and we
-just publish hooks" design.
+This settles whether "let users bring their own checker" is possible. It is, for most
+templates, and `typed-jinja generate` is that path. `typed-jinja check` still owns a
+subprocess and everything below still applies to it.
 
 The stub is generated Python under `.typed_jinja_cache/`, and every checker reports
 positions in that file. Compare what typed-jinja prints:
@@ -24,18 +26,73 @@ against what `ty check` prints over the same cache directory:
 ```
 
 `_template_line` in `typed_jinja/check.py` walks the `# L<n>` markers backwards to turn the
-first into the second. Whoever owns the subprocess owns the remap. Hand the invocation to
-the end user and they get diagnostics pointing at synthetic Python they never wrote.
+first into the second. Whoever owns the subprocess owns the remap.
 
-A post-processor (`ty check --output-format concise | typed-jinja remap`) would work, but it
-still requires parsing each checker's stdout, which is the same work as owning the
-subprocess, with worse ergonomics and no control over the exit code. Not worth it.
+The way out is to make the remap unnecessary rather than to relocate it. If generated line N
+is template line N, any checker reports the right line with nothing in between. See the
+next section for how far that gets.
 
-One real point survives from that direction: `_write_pyright_config` writes a fresh
+A post-processor (`ty check --output-format concise | typed-jinja remap`) remains the answer
+for the templates with no aligned form, and for recovering columns. It parses each checker's
+stdout, which is the work owning the subprocess already does, so it is worth adding only if
+those cases start to matter.
+
+One real point survives regardless: `_write_pyright_config` writes a fresh
 `pyrightconfig.json` and ignores whatever the project already configured, so the stub is
 checked under different settings than the project's own source. That matters most for a
 project using the mypy pydantic plugin, or custom stub paths. Backend discovery answers
 "which binary" and does not answer "under whose config". Decide separately.
+
+## Line-aligned codegen removes the backend problem for most templates
+
+Measured over 126 templates, 11 from `examples/` and 115 real ones from mkdocs-material.
+
+| | count | share |
+|---|---|---|
+| exact line-aligned stub | 120 | 95.2% |
+| no aligned form, keeps `# L` markers | 3 | 2.4% |
+| `_UnsupportedError` escapes `transpile()` | 3 | 2.4% |
+
+Against the 9 example templates carrying a real `{#def #}` header, the aligned stubs
+checked by raw pyright produce diagnostics identical to `check_file`, 9 of 9.
+
+Both checkers find the same three errors on the same lines in a generated stub, with no
+typed-jinja process running:
+
+```
+_jinja_stubs/templates/profile_html.py:5:10  - error: Cannot access attribute "naem" for class "User"
+_jinja_stubs/templates/profile_html.py:5:  error: "User" has no attribute "naem"  [attr-defined]
+```
+
+Five transformations get this from 30% to 95%, each traced to a measured failure:
+
+- hoist `loop` to the preamble so a for-body's first line is free for real statements
+- drop the `_render` placeholder `pass`, which carries the header's line number and sorts
+  behind any macro defined above it. This alone was 73 of the original 78 fallbacks
+- route cross-file macro stubs to a sidecar module, since they carry another template's
+  line numbers
+- demote `{% if x %}{% endif %}` to `_ = x`, a simple statement that can share a physical
+  line where a second compound statement cannot
+- relocate `else:`, because Jinja records no line number for `{% else %}`
+
+The preamble collapses onto the header's own line as `;`-joined simple statements, so
+alignment holds no matter how many imports and globals a project declares. Emitting at
+module level rather than inside `_render` frees the indent level the template's top level
+needs, which means every declared name must be bound (`user: User = _tj_any`) and not just
+annotated, or the real errors disappear under `"user" is unbound`.
+
+What it does not do:
+
+- columns, only lines. Pyright reports column 10 where the template has `{{ user.naem }}`
+  at column 18
+- `{% else %}` sharing a physical line with its branch has no aligned form, which is all
+  3 fallbacks
+- `loop` is bound at module level, so using `loop` outside a `{% for %}` is not flagged
+
+The output directory must not start with a dot. Pyright excludes `**/.*` by default and
+reports a clean run over zero files, which is why the default is `_jinja_stubs` and not
+`.typed_jinja`. Stub paths mirror the template tree with only the filename mangled, because
+a module name cannot carry the template's extension.
 
 ## All three backends agree
 
@@ -87,7 +144,15 @@ Preferred fix is narrowing the catalog to categories every backend agrees on (un
 name, bad attribute, bad call, everything else) rather than keeping codes only one backend
 can produce.
 
+`generate` sidesteps the code question and inherits the suppression one. Users see their own
+checker's native codes, so there is nothing to map. But `{# type: ignore[TJ003] #}` has to
+become a real `# type: ignore[...]` on the aligned line, and the code inside those brackets
+is backend-specific. Unsolved.
+
 ## Batching is the large performance win
+
+This applies to `check` only. `generate` writes files and exits, so the user's own checker
+pays a single startup and keeps its own incremental cache.
 
 `cli.py:37` loops `check_file(template)` per template, and `_run_pyright` launches one
 subprocess per call, so checking N templates pays N process startups. Startup dominates
@@ -142,6 +207,13 @@ Switching the default means rewriting those against neutral TJ codes.
   `[tool.typed_jinja] checker` to pin. The resolved backend should appear in the summary
   line so a CI failure that does not reproduce locally is diagnosable
 - Whether to read the project's existing checker config instead of writing our own
+- Whether `generate` becomes the default and `check` becomes the fallback for the aligned
+  minority, which would drop the runtime dependency set to jinja2 alone
+- Staleness for `generate`. `--check` gates it, but committing the stubs is what makes a
+  fresh clone typecheck correctly before anyone runs typed-jinja
+- Three templates crash `transpile()` with `_UnsupportedError` escaping to the caller
+  (`_emit_for` calls `_target` uncaught, among others), which takes down a whole run rather
+  than skipping one template
 - `pyright[nodejs]` on PyPI bundles node through `nodejs-wheel-binaries`, and `basedpyright`
   requires it unconditionally. Either removes the "pyright must be on PATH" problem without
   changing the inference engine, if staying on pyright turns out to matter
