@@ -8,6 +8,7 @@ line carries a ``# L<n>`` marker back to its source line in the template.
 
 from __future__ import annotations
 
+import keyword
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -27,6 +28,11 @@ _CMP_OPS = {
     'in': 'in',
     'notin': 'not in',
 }
+
+
+def _ident(name: str) -> str:
+    """Rename a Jinja variable that collides with a Python keyword (``{% set class = %}``)."""
+    return f'_tj_kw_{name}' if keyword.iskeyword(name) else name
 
 
 class _UnsupportedError(Exception):
@@ -68,15 +74,15 @@ def transpile(
     param_names = {name for name, _ in header.params}
 
     lines: list[_Line] = [_Line(0, imp, header.lineno) for imp in [*header.imports, *config.imports]]
-    lines.extend([
-        _Line(0, 'from typing import Any as _TJAny', header.lineno),
-        _Line(0, 'def _tj_any(*args: _TJAny, **kwargs: _TJAny) -> _TJAny: ...', header.lineno),
-        _Line(0, '_tj_loop: _TJAny', header.lineno),
-    ])
     lines.extend(
-        _Line(0, f'{name}: {type_str}', header.lineno)
-        for name, type_str in config.globals
-        if name not in param_names
+        [
+            _Line(0, 'from typing import Any as _TJAny', header.lineno),
+            _Line(0, 'def _tj_any(*args: _TJAny, **kwargs: _TJAny) -> _TJAny: ...', header.lineno),
+            _Line(0, '_tj_loop: _TJAny', header.lineno),
+        ]
+    )
+    lines.extend(
+        _Line(0, f'{name}: {type_str}', header.lineno) for name, type_str in config.globals if name not in param_names
     )
 
     module_defs: list[_Line] = []
@@ -209,7 +215,9 @@ def _emit_with(node: nodes.With, out: list[_Line], indent: int) -> None:
 
 def _macro_params(node: nodes.Macro) -> str:
     offset = len(node.args) - len(node.defaults)
-    return ', '.join(f'{arg.name}=None' if index >= offset else arg.name for index, arg in enumerate(node.args))
+    return ', '.join(
+        f'{_ident(arg.name)}=None' if index >= offset else _ident(arg.name) for index, arg in enumerate(node.args)
+    )
 
 
 def _emit_macro(node: nodes.Macro, out: list[_Line], *, indent: int = 0, alias: str | None = None) -> None:
@@ -323,7 +331,7 @@ def _emit_fallback_names(node: nodes.Node, out: list[_Line], indent: int) -> Non
             continue
         out.append(_Line(indent, f'_ = {rendered}', attr.lineno))
     out.extend(
-        _Line(indent, f'_ = {name.name}', name.lineno)
+        _Line(indent, f'_ = {_ident(name.name)}', name.lineno)
         for name in node.find_all(nodes.Name)
         if name.ctx == 'load'
     )
@@ -348,7 +356,7 @@ def _iter_expr(node: nodes.Node, out: list[_Line], indent: int) -> str:
 def _target(node: nodes.Node) -> str:
     match node:
         case nodes.Name():
-            return node.name
+            return _ident(node.name)
         case nodes.Tuple():
             return ', '.join(_target(item) for item in node.items)
         case _:
@@ -358,7 +366,7 @@ def _target(node: nodes.Node) -> str:
 def _expr(node: nodes.Node) -> str:  # ruff:ignore[complex-structure, too-many-return-statements, too-many-branches]
     match node:
         case nodes.Name() if node.ctx == 'load':
-            return node.name
+            return _ident(node.name)
         case nodes.Const():
             return repr(node.value)
         case nodes.Getattr():
