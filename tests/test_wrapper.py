@@ -2,6 +2,7 @@
 
 import ast
 from pathlib import Path
+from typing import cast
 
 import pytest
 from beartype.roar import BeartypeCallHintParamViolation
@@ -34,13 +35,13 @@ def test_beartype_wrapper_renders_and_guards():
     assert 'Ada' in rendered
 
     with pytest.raises(BeartypeCallHintParamViolation):
-        wrapper_beartype.render_profile(profile='not-a-profile')
+        wrapper_beartype.render_profile(profile=cast('Profile', 'not-a-profile'))
 
 
 def test_pydantic_wrapper_coerces_and_rejects():
-    rendered = wrapper_pydantic.render_profile(profile={'name': 'Bo', 'email': 'bo@x.io', 'age': '40'})
+    rendered = wrapper_pydantic.render_profile(profile=cast('Profile', {'name': 'Bo', 'email': 'bo@x.io', 'age': '40'}))
     assert 'Bo' in rendered
     assert 'Age: 40' in rendered
 
     with pytest.raises(ValidationError):
-        wrapper_pydantic.render_profile(profile={'name': 'Bo', 'email': 'bo@x.io'})
+        wrapper_pydantic.render_profile(profile=cast('Profile', {'name': 'Bo', 'email': 'bo@x.io'}))

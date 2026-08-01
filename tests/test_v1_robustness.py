@@ -1,8 +1,9 @@
 """Graceful handling of malformed templates and a missing pyright."""
 
+import shutil
+
 import pytest
 
-from typed_jinja import check as check_mod
 from typed_jinja.check import PyrightNotFoundError, check_file
 from typed_jinja.cli import main
 
@@ -32,7 +33,7 @@ def test_malformed_template_is_a_diagnostic(tmp_path):
 
 
 def test_check_file_raises_when_pyright_missing(tmp_path, monkeypatch):
-    monkeypatch.setattr(check_mod.shutil, 'which', lambda _: None)
+    monkeypatch.setattr(shutil, 'which', lambda _: None)
     template = tmp_path / 'ok.html'
     template.write_text('{#def x: int #}\n{{ x }}', encoding='utf-8')
 
@@ -41,7 +42,7 @@ def test_check_file_raises_when_pyright_missing(tmp_path, monkeypatch):
 
 
 def test_cli_reports_missing_pyright(tmp_path, monkeypatch, capsys):
-    monkeypatch.setattr(check_mod.shutil, 'which', lambda _: None)
+    monkeypatch.setattr(shutil, 'which', lambda _: None)
     template = tmp_path / 'ok.html'
     template.write_text('{#def x: int #}\n{{ x }}', encoding='utf-8')
 

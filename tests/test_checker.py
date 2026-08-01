@@ -30,8 +30,10 @@ def test_parse_header_absent_returns_none():
 
 def test_transpile_narrows_loop_variable():
     source = _BAD.read_text(encoding='utf-8')
+    header = parse_header(source)
+    assert header is not None
 
-    code = transpile(source, parse_header(source)).code
+    code = transpile(source, header).code
 
     assert 'def _render(user: User) -> None:' in code
     assert 'for item in user.items:' in code

@@ -5,7 +5,9 @@ from typed_jinja.transpile import transpile
 
 
 def _code(source):
-    return transpile(source, parse_header(source)).code
+    header = parse_header(source)
+    assert header is not None
+    return transpile(source, header).code
 
 
 def test_macro_is_modeled_with_params():

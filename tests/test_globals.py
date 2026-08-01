@@ -23,16 +23,20 @@ def test_load_config_reads_project_globals():
 
 def test_transpile_without_config_omits_globals():
     source = _USES_GLOBALS.read_text(encoding='utf-8')
+    header = parse_header(source)
+    assert header is not None
 
-    code = transpile(source, parse_header(source), config=Config()).code
+    code = transpile(source, header, config=Config()).code
 
     assert 'static_url' not in code.split('def _render')[0]
 
 
 def test_transpile_with_config_declares_globals():
     source = _USES_GLOBALS.read_text(encoding='utf-8')
+    header = parse_header(source)
+    assert header is not None
 
-    code = transpile(source, parse_header(source), load_config(Path.cwd())).code
+    code = transpile(source, header, load_config(Path.cwd())).code
 
     assert 'static_url: Callable[[str], str]' in code
 

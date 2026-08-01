@@ -25,10 +25,10 @@ def test_compute_diagnostics_maps_positions_and_severity():
     assert all(d.severity == t.DiagnosticSeverity.Error for d in diagnostics)
 
 
-def test_publish_sends_diagnostics_through_the_server():
+def test_publish_sends_diagnostics_through_the_server(monkeypatch):
     server = LanguageServer('test', '0')
     captured: list[t.PublishDiagnosticsParams] = []
-    server.text_document_publish_diagnostics = captured.append
+    monkeypatch.setattr(server, 'text_document_publish_diagnostics', captured.append)
 
     _publish(server, _BAD.resolve().as_uri())
 
@@ -51,7 +51,7 @@ def test_publish_checks_the_live_buffer_over_a_clean_file(monkeypatch):
     monkeypatch.setattr('typed_jinja.lsp._live_source', lambda _server, _uri: edited)
     server = LanguageServer('test', '0')
     captured: list[t.PublishDiagnosticsParams] = []
-    server.text_document_publish_diagnostics = captured.append
+    monkeypatch.setattr(server, 'text_document_publish_diagnostics', captured.append)
 
     _publish(server, _OK.resolve().as_uri())
 
