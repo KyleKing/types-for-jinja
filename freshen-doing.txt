@@ -1,0 +1,9 @@
+# freshen follow-ups
+
+## 2026-08-01
+
+Stashed pre-existing uncommitted work as `freshen 672bb50f: pre-existing WIP` (git stash, not dropped, not applied).
+
+Stashed files and best-guess next step:
+
+- PLAN.md — adds one bullet under "Still deferred" about expanding the LSP past the typed context (tag/filter completions, hover docs, completions for the typed context's own keys and attributes, with typed-htmx as the reference). Next step: decide whether that scope belongs in PLAN.md as deferred or as a tracked issue, then restore the line from the stash and commit it.
