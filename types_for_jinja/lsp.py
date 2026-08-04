@@ -91,8 +91,12 @@ def visible_names(source: str, line: int) -> list[ContextName]:
     return context_names(source, header, config, line=line)
 
 
-RESOLVER = MemberResolver(prepare_cache(CACHE_DIR))
-"""Shared connection to pyright for member lookup; started on first attribute completion."""
+RESOLVER = MemberResolver(CACHE_DIR)
+"""Shared connection to pyright for member lookup; started on first attribute completion.
+
+It is rooted in the checker's cache directory, which already carries a pyrightconfig
+pointing back at the project and the generated filter signatures the probe imports.
+"""
 
 
 def complete(source: str, line: int, column: int) -> list[t.CompletionItem]:  # ruff:ignore[too-many-return-statements]
@@ -140,6 +144,7 @@ def _member_items(source: str, line: int, expression: str) -> list[t.CompletionI
     probe = probe_module(source, header, config, line + 1, expression)
     if probe is None:
         return []
+    prepare_cache(CACHE_DIR)
     return [
         t.CompletionItem(label=member.name, kind=t.CompletionItemKind(member.kind), detail=member.detail)
         for member in RESOLVER.members(probe)
