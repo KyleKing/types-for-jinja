@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import subprocess  # ruff:ignore[suspicious-subprocess-import]
 import sys
 from dataclasses import replace
 from pathlib import Path
@@ -11,6 +12,7 @@ from types_for_jinja.check import Diagnostic, PyrightNotFoundError, check_file
 from types_for_jinja.config import Config, load_config
 from types_for_jinja.emit import stale_files, write_files
 from types_for_jinja.generate import generate, stale, write
+from types_for_jinja.remap import FORMATS, Remapper, remap
 from types_for_jinja.report import format_json, format_sarif, format_text
 from types_for_jinja.wrapper import VALIDATORS, build_wrappers
 
@@ -62,6 +64,28 @@ def _wrapper(templates: list[Path], config: Config, out_dir: Path, *, check_only
     return 0
 
 
+def _remap(args: argparse.Namespace) -> int:
+    """Rewrite a checker's output to name templates, either as a filter or around a command.
+
+    The wrapped form exists because a pipeline hands back the filter's exit code, not the
+    checker's, so ``ty check | types-for-jinja remap`` reports success on a failing run
+    unless the shell is configured for it.
+    """
+    remapper = Remapper(args.out_dir)
+    if not args.command_argv:
+        print(remap(sys.stdin.read(), remapper, args.format), end='')  # ruff:ignore[print]
+        return 0
+    result = subprocess.run(  # ruff:ignore[subprocess-without-shell-equals-true]
+        args.command_argv,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    print(remap(result.stdout, remapper, args.format), end='')  # ruff:ignore[print]
+    print(result.stderr, end='', file=sys.stderr)  # ruff:ignore[print]
+    return result.returncode
+
+
 def _wrapper_config(args: argparse.Namespace, config: Config) -> Config:
     """Let explicit flags win over ``[tool.types_for_jinja.wrapper]``."""
     overrides = {
@@ -101,6 +125,23 @@ def main(argv: list[str] | None = None) -> int:
         action='store_true',
         help='exit non-zero if any stub is missing or out of date instead of writing',
     )
+    remap_parser = subparsers.add_parser(
+        'remap',
+        help="rewrite a type checker's output so it names templates instead of generated stubs",
+    )
+    remap_parser.add_argument('-o', '--out-dir', type=Path, default=Path('_jinja_stubs'), help='the stub directory')
+    remap_parser.add_argument(
+        '--format',
+        choices=list(FORMATS),
+        default='auto',
+        help="shape of the checker's output; auto detects text, pyright JSON, mypy JSON, or ty gitlab",
+    )
+    remap_parser.add_argument(
+        'command_argv',
+        nargs='*',
+        metavar='-- CHECKER ...',
+        help='checker to run and remap; with no command, filters stdin and always exits 0',
+    )
     wrapper_parser = subparsers.add_parser(
         'wrapper',
         help='write a typed render function per template, so the render call site is checked too',
@@ -127,6 +168,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    if args.command == 'remap':
+        return _remap(args)
     templates = _iter_templates(args.paths)
     if args.command == 'generate':
         return _generate(templates, args.out_dir, check_only=args.check)
