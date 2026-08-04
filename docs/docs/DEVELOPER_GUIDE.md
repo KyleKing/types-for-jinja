@@ -77,7 +77,7 @@ uv publish
 | `types_for_jinja/cli.py`                       | 111        | 31      | 0        | 65.7%    |
 | `types_for_jinja/codes.py`                     | 6          | 0       | 0        | 100.0%   |
 | `types_for_jinja/complete.py`                  | 194        | 14      | 0        | 89.8%    |
-| `types_for_jinja/config.py`                    | 58         | 3       | 0        | 92.4%    |
+| `types_for_jinja/config.py`                    | 59         | 3       | 0        | 92.5%    |
 | `types_for_jinja/diagnostic.py`                | 12         | 0       | 0        | 100.0%   |
 | `types_for_jinja/emit.py`                      | 34         | 0       | 0        | 100.0%   |
 | `types_for_jinja/filters.py`                   | 19         | 0       | 0        | 100.0%   |
@@ -86,14 +86,14 @@ uv publish
 | `types_for_jinja/layout.py`                    | 174        | 11      | 0        | 89.3%    |
 | `types_for_jinja/lsp.py`                       | 210        | 29      | 0        | 81.2%    |
 | `types_for_jinja/manifest.py`                  | 58         | 1       | 0        | 96.9%    |
-| `types_for_jinja/members.py`                   | 121        | 14      | 0        | 85.4%    |
+| `types_for_jinja/members.py`                   | 154        | 14      | 0        | 88.0%    |
 | `types_for_jinja/remap.py`                     | 245        | 18      | 0        | 88.2%    |
 | `types_for_jinja/report.py`                    | 22         | 0       | 0        | 100.0%   |
 | `types_for_jinja/resolve.py`                   | 21         | 2       | 0        | 92.6%    |
 | `types_for_jinja/suppress.py`                  | 44         | 0       | 0        | 100.0%   |
 | `types_for_jinja/transpile.py`                 | 408        | 64      | 0        | 81.9%    |
 | `types_for_jinja/wrapper.py`                   | 85         | 2       | 0        | 96.3%    |
-| **Totals**                                     | 2081       | 195     | 37       | 87.5%    |
+| **Totals**                                     | 2115       | 195     | 37       | 87.7%    |
 
 Generated on: 2026-08-04
 <!-- {cte} -->

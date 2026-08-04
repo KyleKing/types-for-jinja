@@ -1,14 +1,17 @@
-"""Ask pyright what members a template expression has.
+"""Ask a Python language server what members a template expression has.
 
-Attribute completion needs the declared type resolved, not just named, and resolving
-types is the one thing this project deliberately does not do itself. So it asks the same
-checker the diagnostics come from: build a probe stub that binds the template's context
-and ends in the expression the cursor is on, hand it to ``pyright-langserver``, and
-forward the completions back.
+Attribute completion needs the declared type resolved, not just named, and resolving types
+is the one thing this project deliberately does not do itself. So it asks a real language
+server: build a probe module that binds the template's context and ends in the expression
+the cursor is on, hand it over, and forward the completions back.
 
-The stub is never written to disk and never executed; it is sent over the wire as an
-unsaved document. The server is started on first use and reused, because starting one
-costs far more than a query.
+Any LSP-speaking Python checker will do, and ``CANDIDATES`` is the list tried in order.
+Adding one is a single entry. When none is installed, member completion returns nothing:
+completion is additive, so its absence stays quiet rather than becoming an error.
+
+The probe is never written to disk and never executed; it is sent over the wire as an
+unsaved document. The server is started on first use and reused, because starting one costs
+far more than a query.
 """
 
 from __future__ import annotations
@@ -18,13 +21,38 @@ import os
 import shutil
 import subprocess  # ruff:ignore[suspicious-subprocess-import]
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import cast
 
 _TIMEOUT_SECONDS = 10.0
 
-__all__ = ['Member', 'MemberResolver']
+_CAPABILITIES = {
+    'textDocument': {
+        'completion': {
+            'completionItem': {
+                'documentationFormat': ['markdown', 'plaintext'],
+                'resolveSupport': {'properties': ['detail', 'documentation']},
+            },
+        },
+    },
+}
+"""Declared so a server that withholds a member's type until resolve will hand it over."""
+
+__all__ = ['CANDIDATES', 'Member', 'MemberResolver']
+
+CANDIDATES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ('pyright-langserver', ('--stdio',)),
+    ('basedpyright-langserver', ('--stdio',)),
+    ('ty', ('server',)),
+    ('pylsp', ()),
+    ('jedi-language-server', ()),
+)
+"""Language servers to try, most precise first, as ``(executable, arguments)``.
+
+pyright leads because its completion details carry the resolved type. A project that wants
+a particular one names it in ``[tool.types_for_jinja] language_server``.
+"""
 
 
 @dataclass(frozen=True)
@@ -36,22 +64,35 @@ class Member:
     detail: str
 
 
+def discover(preferred: str = '') -> tuple[str, tuple[str, ...]] | None:
+    """The first candidate language server on PATH, or ``None`` when there is none.
+
+    ``preferred`` pins one by executable name and disables the fallback, so a project that
+    asks for a specific server never silently gets a different one.
+    """
+    candidates = [entry for entry in CANDIDATES if entry[0] == preferred] if preferred else list(CANDIDATES)
+    if preferred and not candidates:
+        candidates = [(preferred, ())]
+    return next(((name, args) for name, args in candidates if shutil.which(name) is not None), None)
+
+
 class MemberResolver:
-    """A reusable ``pyright-langserver`` connection scoped to one project root.
+    """A reusable Python language server connection scoped to one project root.
 
     Not thread-safe on its own; ``members`` serialises callers behind a lock. Call
     ``shutdown`` when finished, after which the resolver must not be reused.
     """
 
-    def __init__(self, root: Path, probe: Path) -> None:
+    def __init__(self, root: Path, probe: Path, language_server: str = '') -> None:
         """Bind the resolver to ``root``; no server starts until the first query.
 
         ``probe`` is where the throwaway module is claimed to live, relative to ``root`` or
-        absolute. It must sit inside the generated stub tree, because the probe imports the
-        generated filter signatures relatively and a checker resolves that from the path.
+        absolute. ``language_server`` pins one executable instead of taking the first of
+        ``CANDIDATES`` found on PATH.
         """
         self._root = root.resolve()
         self._probe = probe if probe.is_absolute() else self._root / probe
+        self._language_server = language_server
         self._lock = threading.Lock()
         self._process: subprocess.Popen[bytes] | None = None
         self._next_id = 1
@@ -87,17 +128,36 @@ class MemberResolver:
             'textDocument/completion',
             {'textDocument': {'uri': uri}, 'position': position},
         )
-        return _to_members(result)
+        return [self._resolved(process, item) for item in _offered(result)]
+
+    def _resolved(self, process: subprocess.Popen[bytes], item: dict[str, object]) -> Member:
+        """Fill in a member's type when the server only sends it on resolve.
+
+        ty answers with the type in ``detail`` straight away. pyright sends nothing there and
+        puts it in ``documentation`` on resolve instead, so without this the popup lists
+        member names with no types beside them.
+        """
+        member = _to_member(item)
+        if member.detail or 'data' not in item:
+            return member
+        try:
+            extra = self._request(process, 'completionItem/resolve', item)
+        except (OSError, TypeError, ValueError):
+            return member
+        if not isinstance(extra, dict):
+            return member
+        return replace(member, detail=_detail_of(cast('dict[str, object]', extra)))
 
     def _ensure_started(self) -> subprocess.Popen[bytes]:
         if self._process is not None and self._process.poll() is None:
             return self._process
-        executable = shutil.which('pyright-langserver')
-        if executable is None:
-            message = 'pyright-langserver not found on PATH'
+        found = discover(self._language_server)
+        if found is None:
+            message = 'no Python language server found on PATH'
             raise OSError(message)
+        name, args = found
         self._process = subprocess.Popen(  # ruff:ignore[subprocess-without-shell-equals-true]
-            [executable, '--stdio'],
+            [shutil.which(name) or name, *args],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
@@ -110,7 +170,7 @@ class MemberResolver:
             {
                 'processId': os.getpid(),
                 'rootUri': self._root.as_uri(),
-                'capabilities': {},
+                'capabilities': _CAPABILITIES,
                 'initializationOptions': {},
             },
         )
@@ -178,19 +238,43 @@ def _read_message(process: subprocess.Popen[bytes]) -> dict[str, object]:
     return parsed
 
 
-def _to_members(result: object) -> list[Member]:
+def _offered(result: object) -> list[dict[str, object]]:
+    """The completion items worth showing: labelled, and not a dunder."""
     items = result.get('items', []) if isinstance(result, dict) else result
     if not isinstance(items, list):
         return []
-    members = []
-    for raw_item in items:
-        if not isinstance(raw_item, dict) or 'label' not in raw_item:
+    offered: list[dict[str, object]] = []
+    for raw in items:
+        if not isinstance(raw, dict):
             continue
-        item = cast('dict[str, object]', raw_item)
-        label = str(item['label'])
-        if label.startswith('__'):
-            continue
-        kind = item.get('kind', 5)
-        detail = str(item.get('detail', ''))
-        members.append(Member(name=label, kind=kind if isinstance(kind, int) else 5, detail=detail))
-    return members
+        item = cast('dict[str, object]', raw)
+        label = item.get('label')
+        if isinstance(label, str) and not label.startswith('__'):
+            offered.append(item)
+    return offered
+
+
+def _to_member(item: dict[str, object]) -> Member:
+    kind = item.get('kind', 5)
+    return Member(name=str(item.get('label', '')), kind=kind if isinstance(kind, int) else 5, detail=_detail_of(item))
+
+
+def _detail_of(item: dict[str, object]) -> str:
+    """The type to show beside a member, from wherever the server chose to put it.
+
+    Servers disagree on shape: ty answers ``str`` and pyright answers ``name: str``. The
+    label is already in the popup, so the redundant prefix is dropped and both read alike.
+    """
+    detail = item.get('detail')
+    text = detail.strip() if isinstance(detail, str) and detail.strip() else _plain(item.get('documentation'))
+    prefix = f'{item.get("label", "")}:'
+    return text.removeprefix(prefix).strip() if text.startswith(prefix) else text
+
+
+def _plain(documentation: object) -> str:
+    """Strip a markdown documentation block down to the one line that names the type."""
+    text = documentation.get('value', '') if isinstance(documentation, dict) else documentation
+    if not isinstance(text, str):
+        return ''
+    lines = [line.strip() for line in text.splitlines() if line.strip() and not line.startswith('```')]
+    return lines[0] if lines else ''

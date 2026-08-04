@@ -2,6 +2,7 @@
 
 ### Feat
 
+- **nvim**: mirror stub diagnostics onto the template buffer
 - **lsp**: write stubs instead of running a checker
 - **cli**: add remap to name templates in checker output
 - **generate**: record each stub's template in a manifest

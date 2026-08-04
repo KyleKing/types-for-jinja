@@ -107,7 +107,11 @@ def resolver() -> MemberResolver:
     global _RESOLVER  # ruff:ignore[global-statement]
     with _RESOLVER_LOCK:
         if _RESOLVER is None:
-            _RESOLVER = MemberResolver(Path.cwd(), Path('_tj_probe.py'))
+            _RESOLVER = MemberResolver(
+                Path.cwd(),
+                Path('_tj_probe.py'),
+                load_config(Path.cwd()).language_server,
+            )
         return _RESOLVER
 
 
