@@ -68,7 +68,9 @@ def reported(template: Path, config: Config | None = None, backend: str = DEFAUL
     Assumes the working directory is the project root, which the ``project`` fixtures arrange.
     """
     root = Path.cwd()
-    templates = sorted(path.relative_to(root) for path in root.rglob('*.jinja') if STUB_DIR not in path.parts)
+    globs = (config or Config()).template_globs
+    matched = {path for glob in globs for path in root.rglob(glob) if STUB_DIR not in path.parts}
+    templates = sorted(path.relative_to(root) for path in matched)
     write(generate(templates, Path(STUB_DIR), config))
     invocation = _INVOCATIONS[backend]
     remapper = Remapper(Path(STUB_DIR), root=root)

@@ -20,7 +20,9 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
-_TEXT_RE = re.compile(r'^\s*(?:-->\s*)?(?P<path>\S+?):(?P<line>\d+):(?P<column>\d+)(?:[\s:]|$)(?P<message>.*)$')
+_TEXT_RE = re.compile(r'^\s*(?:-->\s*)?(?P<path>.+?):(?P<line>\d+):(?P<column>\d+)(?:[\s:]|$)(?P<message>.*)$')
+"""The path may contain spaces: Copier and Cookiecutter put Jinja expressions in directory
+names, so ``template/{{ module_name }}/__init__.py.jinja`` is a real reported path."""
 _ANNOTATION_RE = re.compile(r'^::(?:error|warning)\s+(?P<attrs>[^:]*)::(?P<message>.*)$')
 
 Location = tuple[str, int, int, str]

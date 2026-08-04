@@ -231,6 +231,14 @@ variable_start_string = "[["
 variable_end_string = "]]"
 ```
 
+Copier and Cookiecutter put Jinja expressions in directory names. A stub tree mangles a directory name that is not already a valid identifier, so `template/{{ module_name }}/__init__.py.jinja` is checkable and still reported at its real path. Set `template_globs` when the templates are not `.html`, `.jinja`, or `.j2`:
+
+```toml
+[tool.types_for_jinja]
+template_dirs = ["{{cookiecutter.project_slug}}"]
+template_globs = ["*.md", "*.py", "*.toml"]
+```
+
 Templates shipped inside an installed package (what `jinja2.PackageLoader` loads) are reachable with a `package:subdirectory` entry in `template_dirs`, alongside plain paths:
 
 ```toml

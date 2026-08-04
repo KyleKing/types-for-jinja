@@ -113,7 +113,9 @@ Five transformations took alignment from 30% to 95%, each traced to a measured f
 
 The preamble collapses onto the header's own line as `;`-joined simple statements, so alignment holds no matter how many imports and globals a project declares. Emitting at module level frees the indent level the template's top level needs, which means every declared name must be bound (`user: User = _tj_any`), not just annotated, or real errors disappear under `"user" is unbound`. Known gap: `loop` is bound at module level, so using `loop` outside a `{% for %}` is not flagged.
 
-The output directory must not start with a dot, because pyright excludes `**/.*` by default and reports a clean run over zero files. Every segment must also be a valid identifier, because the stubs import each other relatively. Stub paths mirror the template tree with only the filename mangled, since a module name cannot carry the template's extension.
+The output directory must not start with a dot, because pyright excludes `**/.*` by default and reports a clean run over zero files. Every segment must also be a valid identifier, because the stubs import each other relatively.
+
+Stub paths mirror the template tree, with the filename always mangled (a module name cannot carry the template's extension) and directory names mangled only when they are not already identifiers. That last part is not cosmetic. Copier and Cookiecutter put Jinja expressions in directory names, and mypy refuses an entire run when it finds `{{ module_name }}/__init__.py`, reporting `contains __init__.py but is not a valid Python package name` and checking nothing at all. ty and pyright tolerated it, so the failure appeared on one backend only. Leading underscores are kept rather than stripped, so `_draft.jinja` and `draft.jinja` do not write the same stub.
 
 ### File and line fidelity
 

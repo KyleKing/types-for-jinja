@@ -6,6 +6,7 @@ a generated path reads back as the template it came from.
 
 from __future__ import annotations
 
+import keyword
 from pathlib import Path
 
 __all__ = [
@@ -20,13 +21,22 @@ __all__ = [
 
 
 def mirrored_path(template: Path, out_dir: Path) -> Path:
-    """Mirror the template's own directories under ``out_dir``.
+    """Mirror the template's own directories under ``out_dir``, as usable module names.
 
-    Only the filename is mangled, because a module name cannot carry the template's
-    extension: ``templates/greeting.html`` becomes ``templates/greeting_html.py``.
+    The filename has to be mangled because a module name cannot carry the template's
+    extension: ``templates/greeting.html`` becomes ``templates/greeting_html.py``. Directory
+    names are mangled only when they are not already identifiers, which leaves an ordinary tree
+    readable while keeping a Copier or Cookiecutter tree checkable: mypy refuses an entire run
+    when it finds ``{{ module_name }}/__init__.py``, since that cannot be a package.
     """
     relative = _project_relative(template)
-    return out_dir / relative.with_name(flat_name(Path(relative.name)) + '.py')
+    directories = [_segment(part) for part in relative.parts[:-1]]
+    return out_dir.joinpath(*directories, flat_name(Path(relative.name)) + '.py')
+
+
+def _segment(part: str) -> str:
+    """A directory name a checker can treat as a package, left alone when it already is one."""
+    return part if part.isidentifier() and not keyword.iskeyword(part) else flat_name(Path(part))
 
 
 def _project_relative(template: Path) -> Path:
@@ -42,8 +52,13 @@ def _project_relative(template: Path) -> Path:
 
 
 def flat_name(template: Path) -> str:
-    """Collapse a path into a single Python-safe identifier."""
-    return ''.join(char if char.isalnum() else '_' for char in str(template)).strip('_')
+    """Collapse a path into a single Python-safe identifier.
+
+    Leading underscores are kept rather than stripped, so ``_draft.jinja`` and ``draft.jinja``
+    do not collapse onto the same stub and silently overwrite each other.
+    """
+    collapsed = ''.join(char if char.isalnum() else '_' for char in str(template))
+    return collapsed if collapsed[:1].isalpha() or collapsed.startswith('_') else f'_{collapsed}'
 
 
 def package_markers(out_dir: Path, generated: Path) -> dict[Path, str]:

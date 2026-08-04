@@ -2,6 +2,7 @@
 
 ### Feat
 
+- **cli**: broaden template discovery and default to template_dirs
 - **transpile**: check templates that use namespace() and Jinja's globals
 - **config**: declare jinja2 extensions so their tags parse
 - **components**: check JinjaX component tags against their own header
