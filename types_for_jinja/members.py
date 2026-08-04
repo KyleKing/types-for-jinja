@@ -20,6 +20,7 @@ import subprocess  # ruff:ignore[suspicious-subprocess-import]
 import threading
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 _PROBE_NAME = '_tj_probe.py'
 _TIMEOUT_SECONDS = 10.0
@@ -176,8 +177,15 @@ def _to_members(result: object) -> list[Member]:
     items = result.get('items', []) if isinstance(result, dict) else result
     if not isinstance(items, list):
         return []
-    return [
-        Member(name=str(item['label']), kind=int(item.get('kind', 5)), detail=str(item.get('detail', '')))
-        for item in items
-        if isinstance(item, dict) and 'label' in item and not str(item['label']).startswith('__')
-    ]
+    members = []
+    for raw_item in items:
+        if not isinstance(raw_item, dict) or 'label' not in raw_item:
+            continue
+        item = cast('dict[str, object]', raw_item)
+        label = str(item['label'])
+        if label.startswith('__'):
+            continue
+        kind = item.get('kind', 5)
+        detail = str(item.get('detail', ''))
+        members.append(Member(name=label, kind=kind if isinstance(kind, int) else 5, detail=detail))
+    return members
