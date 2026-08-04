@@ -1,16 +1,22 @@
--- Headless check that the types-for-jinja LSP attaches and publishes diagnostics.
--- Run from the project root: nvim --headless -l scripts/verify_lsp.lua
--- Phase 1 checks a bad template on disk. Phase 2 makes an unsaved edit to a
--- clean template and confirms a diagnostic appears from the live buffer.
--- Phase 3 asks for completions inside a loop body. Phase 4 hovers a parameter.
--- Phase 5 completes an attribute, which is resolved through pyright-langserver.
+-- Headless check that the types-for-jinja LSP works in a real editor session.
+--
+-- Run through scripts/verify_lsp.sh, which builds a throwaway project first so
+-- nothing is written into the repo. The server no longer runs a type checker, so
+-- the phases split in two: what this server publishes on its own, and the stub it
+-- writes for the project's own Python language server to check.
+--
+--   1. a template with no {#def #} header is reported, not silently skipped
+--   2. opening a template writes its stub
+--   3. an unsaved edit is in the stub before the file is saved
+--   4. context-name completion inside a {% for %} body
+--   5. hover over a declared parameter
+--   6. attribute completion after a `.`, resolved through a language server
+--   7. filter completion after `|`
+--
 -- Exits 0 only when every phase produces the expected result.
 
 local root = vim.fn.getcwd()
-local exe = root .. '/.venv/bin/types-for-jinja-lsp'
-if not (vim.uv or vim.loop).fs_stat(exe) then
-  exe = 'types-for-jinja-lsp'
-end
+local exe = os.getenv('TJ_LSP') or 'types-for-jinja-lsp'
 
 vim.filetype.add({
   extension = { jinja = 'jinja' },
@@ -34,35 +40,24 @@ local function open(path)
   return buf
 end
 
--- Phase 1: bad template on disk.
-local bad = open(root .. '/examples/templates/greeting_bad.html.jinja')
-vim.wait(20000, function() return #vim.diagnostic.get(bad) > 0 end, 200)
-local disk_diags = vim.diagnostic.get(bad)
-io.write(string.format('phase1 (disk) diagnostics=%d\n', #disk_diags))
-for _, d in ipairs(disk_diags) do
-  io.write(string.format('  L%d C%d [%s] %s\n', d.lnum + 1, d.col + 1, d.source or '?', d.message))
+local function read(path)
+  local handle = io.open(path, 'r')
+  if not handle then return nil end
+  local text = handle:read('*a')
+  handle:close()
+  return text
 end
 
--- Phase 2: clean template, unsaved edit introduces a typo.
-local ok = open(root .. '/examples/templates/greeting_ok.html.jinja')
-vim.wait(3000, function() return false end, 200)
-local before = vim.diagnostic.get(ok)
-for i, line in ipairs(vim.api.nvim_buf_get_lines(ok, 0, -1, false)) do
-  if line:find('user%.name') then
-    vim.api.nvim_buf_set_lines(ok, i - 1, i, false, { (line:gsub('user%.name', 'user.nmae')) })
-    break
-  end
-end
-local live_appeared = vim.wait(20000, function() return #vim.diagnostic.get(ok) > 0 end, 200)
-local live = vim.diagnostic.get(ok)
-io.write(string.format('phase2 (live buffer) clean_before=%d after_edit=%d\n', #before, #live))
-for _, d in ipairs(live) do
-  io.write(string.format('  L%d C%d [%s] %s\n', d.lnum + 1, d.col + 1, d.source or '?', d.message))
+local function wait_for_stub(path, needle)
+  local found = vim.wait(20000, function()
+    local text = read(path)
+    return text ~= nil and text:find(needle, 1, true) ~= nil
+  end, 200)
+  return found, read(path)
 end
 
--- Phase 3: completions offered inside the {% for %} body of the clean template.
 local function request(buf, method, params)
-  local responses = vim.lsp.buf_request_sync(buf, method, params, 10000) or {}
+  local responses = vim.lsp.buf_request_sync(buf, method, params, 15000) or {}
   for _, response in pairs(responses) do
     if response.result then return response.result end
   end
@@ -76,36 +71,76 @@ local function position(buf, line, col)
   }
 end
 
-local clean = open(root .. '/examples/templates/greeting_ok.html.jinja')
-local completion = request(clean, 'textDocument/completion', position(clean, 11, 13)) or {}
-local items = completion.items or completion
-local labels = {}
-for _, item in ipairs(items) do labels[item.label] = item.detail or '' end
-io.write(string.format('phase3 (completion) items=%d\n', #items))
-for label, detail in pairs(labels) do io.write(string.format('  %s -- %s\n', label, detail)) end
+local function labels(result)
+  local items = (result and (result.items or result)) or {}
+  local out = {}
+  for _, item in ipairs(items) do out[item.label] = item.detail or '' end
+  return out
+end
 
--- Phase 4: hover over the `user` parameter reports its declared type.
-local hovered = request(clean, 'textDocument/hover', position(clean, 5, 14))
+local stub = root .. '/_jinja_stubs/templates/page_html_jinja.py'
+
+-- Phase 1: a headerless template is reported by this server, which needs no checker.
+local bare = open(root .. '/templates/bare.html.jinja')
+vim.wait(20000, function() return #vim.diagnostic.get(bare) > 0 end, 200)
+local bare_diags = vim.diagnostic.get(bare)
+io.write(string.format('phase1 (no header) diagnostics=%d\n', #bare_diags))
+for _, d in ipairs(bare_diags) do
+  io.write(string.format('  L%d [%s] %s\n', d.lnum + 1, d.source or '?', d.message))
+end
+
+-- Phase 2: opening a template writes its stub.
+local page = open(root .. '/templates/page.html.jinja')
+local wrote, stub_text = wait_for_stub(stub, '_ = user.naem')
+io.write(string.format('phase2 (stub written) ok=%s\n', tostring(wrote)))
+
+-- Phase 3: an unsaved edit reaches the stub.
+for i, line in ipairs(vim.api.nvim_buf_get_lines(page, 0, -1, false)) do
+  if line:find('user%.naem') then
+    vim.api.nvim_buf_set_lines(page, i - 1, i, false, { (line:gsub('user%.naem', 'user.nmae')) })
+    break
+  end
+end
+local edited, edited_text = wait_for_stub(stub, '_ = user.nmae')
+io.write(string.format('phase3 (unsaved edit in stub) ok=%s\n', tostring(edited)))
+
+-- Phase 4: context names inside the {% for %} body.
+local names = labels(request(page, 'textDocument/completion', position(page, 8, 10)))
+io.write('phase4 (context completion)\n')
+for label, detail in pairs(names) do io.write(string.format('  %s -- %s\n', label, detail)) end
+
+-- Phase 5: hover over the declared parameter.
+local hovered = request(page, 'textDocument/hover', position(page, 5, 14))
 local hover_value = hovered and hovered.contents and hovered.contents.value or ''
-io.write(string.format('phase4 (hover) %s\n', hover_value:gsub('\n', ' ')))
+io.write(string.format('phase5 (hover) %s\n', hover_value:gsub('\n', ' ')))
 
--- Phase 5: attribute completion inside the loop body, resolved through pyright.
-vim.api.nvim_buf_set_lines(clean, 10, 11, false, { '  <li>{{ item.' })
-vim.wait(500)
-local members = request(clean, 'textDocument/completion', position(clean, 11, 14)) or {}
-local member_items = members.items or members
-local member_labels = {}
-for _, item in ipairs(member_items) do member_labels[#member_labels + 1] = item.label end
-io.write(string.format('phase5 (members) %s\n', table.concat(member_labels, ',')))
+-- Phase 6: attribute completion inside the loop body, resolved through a language server.
+vim.api.nvim_buf_set_lines(page, 7, 8, false, { '  <li>{{ item.' })
+vim.wait(1000)
+local members = labels(request(page, 'textDocument/completion', position(page, 8, 14)))
+local member_names = {}
+for label in pairs(members) do member_names[#member_names + 1] = label end
+table.sort(member_names)
+io.write(string.format('phase6 (members) %s\n', table.concat(member_names, ',')))
 
-local phase1_ok = #disk_diags > 0
-local phase2_ok = live_appeared and #before == 0
-local phase3_ok = labels['item'] ~= nil and labels['loop'] ~= nil and labels['user'] == 'user: User (parameter)'
-local phase4_ok = hover_value:find('user: User', 1, true) ~= nil
-local phase5_ok = #member_labels == 2 and member_labels[1] == 'title' and member_labels[2] == 'done'
-io.write(string.format('phases ok: 1=%s 2=%s 3=%s 4=%s 5=%s\n',
-  tostring(phase1_ok), tostring(phase2_ok), tostring(phase3_ok), tostring(phase4_ok), tostring(phase5_ok)))
-if phase1_ok and phase2_ok and phase3_ok and phase4_ok and phase5_ok then
+-- Phase 7: built-in filters after a pipe.
+vim.api.nvim_buf_set_lines(page, 7, 8, false, { '  <li>{{ item |' })
+local filters = labels(request(page, 'textDocument/completion', position(page, 8, 15)))
+io.write(string.format('phase7 (filters) length=%s\n', tostring(filters['length'])))
+
+local phase1_ok = #bare_diags == 1 and bare_diags[1].message:find('{#def', 1, true) ~= nil
+local phase2_ok = wrote and stub_text ~= nil
+local phase3_ok = edited and edited_text:find('naem', 1, true) == nil
+local phase4_ok = names['item'] ~= nil and names['loop'] ~= nil and names['user'] == 'user: User (parameter)'
+local phase5_ok = hover_value:find('user: User', 1, true) ~= nil
+local phase6_ok = #member_names == 2 and member_names[1] == 'done' and member_names[2] == 'title'
+local phase7_ok = filters['length'] ~= nil and filters['length']:find('int', 1, true) ~= nil
+
+io.write(string.format('phases ok: 1=%s 2=%s 3=%s 4=%s 5=%s 6=%s 7=%s\n',
+  tostring(phase1_ok), tostring(phase2_ok), tostring(phase3_ok), tostring(phase4_ok),
+  tostring(phase5_ok), tostring(phase6_ok), tostring(phase7_ok)))
+
+if phase1_ok and phase2_ok and phase3_ok and phase4_ok and phase5_ok and phase6_ok and phase7_ok then
   vim.cmd('qall!')
 else
   vim.cmd('cquit 1')

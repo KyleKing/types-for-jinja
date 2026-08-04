@@ -16,9 +16,10 @@ from typing import Literal
 
 from jinja2 import TemplateSyntaxError, nodes
 
+from types_for_jinja import filters
 from types_for_jinja.config import Config, Syntax
 from types_for_jinja.header import TemplateHeader
-from types_for_jinja.transpile import MacroTypes, build_environment, deepest_line, macro_defs, transpile
+from types_for_jinja.transpile import Line, MacroTypes, build_environment, deepest_line, macro_defs, transpile
 
 _IDENT_RUN = re.compile(r'[A-Za-z_][A-Za-z0-9_]*$')
 _WORD_AT = re.compile(r'[A-Za-z_][A-Za-z0-9_]*')
@@ -121,7 +122,11 @@ def probe_module(source: str, header: TemplateHeader, config: Config, line: int,
 
     This is the transpiled stub truncated at the cursor rather than a flat list of
     bindings, so the probe sits inside the same ``for`` and ``if`` scopes the template
-    does and a loop variable keeps the element type pyright narrowed it to.
+    does and a loop variable keeps the element type the language server narrowed it to.
+
+    The filter signatures are inlined rather than imported, which keeps the probe
+    self-contained: it resolves wherever it is claimed to live, with no generated stub tree
+    needed beside it.
     """
     repaired = _repaired(source, line, config.syntax)
     if repaired is None:
@@ -135,9 +140,16 @@ def probe_module(source: str, header: TemplateHeader, config: Config, line: int,
         return None
     last = kept[-1]
     indent = last.indent + 1 if last.text.endswith(':') else last.indent
-    body = ['    ' * entry.indent + entry.text for entry in kept]
+    body = [_inlined(entry) for entry in kept]
     body.append('    ' * indent + f'_tj_probe = {expression}.')
     return '\n'.join(body) + '\n'
+
+
+def _inlined(entry: Line) -> str:
+    """Replace the generated filter import with the signatures themselves."""
+    if entry.text.startswith('from ') and f'{filters.MODULE_NAME} import' in entry.text:
+        return filters.module_source()
+    return '    ' * entry.indent + entry.text
 
 
 def _repaired(source: str, line: int, syntax: Syntax) -> str | None:

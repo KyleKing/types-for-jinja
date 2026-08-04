@@ -26,6 +26,7 @@
 
 ### Fix
 
+- **generate**: make stub-to-stub imports resolve without a search path
 - **lsp**: prepare the checker cache on first use, not on import
 - restore the collapsed {#def #} headers and stop them silently breaking
 - **deps**: bump gitpython to 3.1.57

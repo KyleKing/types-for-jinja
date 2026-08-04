@@ -1,16 +1,20 @@
-"""Language server that publishes types-for-jinja diagnostics to an editor.
+"""Language server for Jinja templates. It never runs a type checker.
 
-On open, change, and save of a template, it runs the checker and publishes the
-results as LSP diagnostics. It checks the live buffer text while a document is
-open, so unsaved edits are reflected, and falls back to the file on disk when no
-buffer is tracked.
+On open, save, and once an edit settles, it re-transpiles the live buffer and writes the
+stub into the project's stub tree. The project's own Python language server is already
+watching that tree, so it re-checks the changed file inside its incremental session and
+reports the type errors itself, on the template's own line. ``editors/nvim`` mirrors those
+onto the template buffer.
 
-It also completes and describes the names the typed context makes available at the
-cursor, which is what the ``{#def ... #}`` header is for.
+What this server publishes is only what it knows without a checker: a template with no
+``{#def ... #}`` header, a malformed header, a Jinja syntax error, or a construct the
+transpiler cannot model. It also completes and describes the names the typed context makes
+available at the cursor, which is what the header is for.
 """
 
 from __future__ import annotations
 
+import os
 import threading
 from collections.abc import Callable
 from pathlib import Path
@@ -20,16 +24,17 @@ from pygls.lsp.server import LanguageServer
 from pygls.uris import to_fs_path
 
 from types_for_jinja import filters
-from types_for_jinja.check import CACHE_DIR, Diagnostic, PyrightNotFoundError, check_file, check_source, prepare_cache
 from types_for_jinja.complete import ContextName, context_names, cursor_context, describe, probe_module, word_at
-from types_for_jinja.config import load_config
+from types_for_jinja.config import Config, load_config
+from types_for_jinja.diagnostic import Diagnostic
+from types_for_jinja.generate import diagnose, generate, write
 from types_for_jinja.header import parse_header
 from types_for_jinja.members import MemberResolver
 
 SERVER = LanguageServer('types-for-jinja-lsp', '0.0.1')
 
 DEBOUNCE_SECONDS = 0.3
-"""How long a buffer must be idle before an edit triggers a re-check."""
+"""How long a buffer must be idle before an edit triggers a re-sync."""
 
 _PENDING: dict[str, threading.Timer] = {}
 _PENDING_LOCK = threading.Lock()
@@ -50,21 +55,16 @@ def _to_lsp(diagnostic: Diagnostic) -> t.Diagnostic:
     )
 
 
-def compute_diagnostics(path: Path) -> list[t.Diagnostic]:
-    """Run the checker over ``path`` on disk (empty if pyright is absent)."""
-    try:
-        diagnostics = check_file(path)
-    except PyrightNotFoundError:
-        return []
-    return [_to_lsp(diagnostic) for diagnostic in diagnostics]
+def sync_stub(source: str, path: Path, config: Config | None = None) -> list[t.Diagnostic]:
+    """Write ``path``'s stub from live buffer ``source`` and report what stopped it.
 
-
-def compute_diagnostics_source(source: str, path: Path) -> list[t.Diagnostic]:
-    """Run the checker over live buffer ``source`` labelled as ``path``."""
-    try:
-        diagnostics = check_source(source, path)
-    except PyrightNotFoundError:
-        return []
+    Writing the buffer's stub, rather than the saved file's, is what makes an unsaved edit
+    visible to the project's Python language server. It leaves the stub tree ahead of the
+    saved template until the next save, which is the point.
+    """
+    resolved = config or load_config(Path.cwd())
+    diagnostics = diagnose(source, path, resolved)
+    write(generate([path], Path(resolved.out_dir), resolved, sources={path: source}))
     return [_to_lsp(diagnostic) for diagnostic in diagnostics]
 
 
@@ -91,12 +91,22 @@ def visible_names(source: str, line: int) -> list[ContextName]:
     return context_names(source, header, config, line=line)
 
 
-RESOLVER = MemberResolver(CACHE_DIR)
-"""Shared connection to pyright for member lookup; started on first attribute completion.
+_RESOLVER: MemberResolver | None = None
+_RESOLVER_LOCK = threading.Lock()
 
-It is rooted in the checker's cache directory, which already carries a pyrightconfig
-pointing back at the project and the generated filter signatures the probe imports.
-"""
+
+def resolver() -> MemberResolver:
+    """The shared language server connection for member lookup, built on first use.
+
+    Built lazily rather than at import, because the project root is only known once the client
+    has said which workspace it opened. Rooted there so the template's own declared types
+    resolve; the probe itself is self-contained and needs nothing generated beside it.
+    """
+    global _RESOLVER  # ruff:ignore[global-statement]
+    with _RESOLVER_LOCK:
+        if _RESOLVER is None:
+            _RESOLVER = MemberResolver(Path.cwd(), Path('_tj_probe.py'))
+        return _RESOLVER
 
 
 def complete(source: str, line: int, column: int) -> list[t.CompletionItem]:  # ruff:ignore[too-many-return-statements]
@@ -144,10 +154,9 @@ def _member_items(source: str, line: int, expression: str) -> list[t.CompletionI
     probe = probe_module(source, header, config, line + 1, expression)
     if probe is None:
         return []
-    prepare_cache(CACHE_DIR)
     return [
         t.CompletionItem(label=member.name, kind=t.CompletionItemKind(member.kind), detail=member.detail)
-        for member in RESOLVER.members(probe)
+        for member in resolver().members(probe)
     ]
 
 
@@ -210,15 +219,21 @@ def _publish(server: LanguageServer, uri: str) -> None:
         return
     path = Path(fs_path)
     source = _live_source(server, uri)
-    diagnostics = compute_diagnostics(path) if source is None else compute_diagnostics_source(source, path)
-    server.text_document_publish_diagnostics(t.PublishDiagnosticsParams(uri=uri, diagnostics=diagnostics))
+    if source is None:
+        try:
+            source = path.read_text(encoding='utf-8')
+        except OSError:
+            return
+    server.text_document_publish_diagnostics(
+        t.PublishDiagnosticsParams(uri=uri, diagnostics=sync_stub(source, path)),
+    )
 
 
 def _publish_debounced(server: LanguageServer, uri: str, delay: float = DEBOUNCE_SECONDS) -> None:
-    """Check ``uri`` once the buffer has been quiet for ``delay``, replacing any pending check.
+    """Re-sync ``uri`` once the buffer has been quiet for ``delay``, replacing any pending sync.
 
-    Each check spawns pyright, which is far slower than a keystroke, so checking on every
-    change would queue work faster than it drains and stall completion and hover behind it.
+    Transpiling is fast, but writing a stub on every keystroke would make the project's own
+    language server re-check the file that often, and its work is what the debounce protects.
     """
     with _PENDING_LOCK:
         pending = _PENDING.pop(uri, None)
@@ -230,22 +245,49 @@ def _publish_debounced(server: LanguageServer, uri: str, delay: float = DEBOUNCE
         timer.start()
 
 
+@SERVER.feature(t.INITIALIZED)
+def initialized(server: LanguageServer, _params: t.InitializedParams) -> None:
+    """Move to the workspace root, which every relative path in this process then resolves against.
+
+    ``pyproject.toml`` and the stub output directory both belong to the project, not to
+    whatever directory the editor happened to start in. One server process serves one
+    workspace, so changing directory is the whole fix.
+    """
+    root = server.workspace.root_path
+    if root and Path(root).is_dir():
+        os.chdir(root)
+
+
 @SERVER.feature(t.TEXT_DOCUMENT_DID_OPEN)
 def did_open(server: LanguageServer, params: t.DidOpenTextDocumentParams) -> None:
-    """Check a template when it is opened."""
+    """Write the template's stub when it is opened."""
     _publish(server, params.text_document.uri)
 
 
 @SERVER.feature(t.TEXT_DOCUMENT_DID_CHANGE)
 def did_change(server: LanguageServer, params: t.DidChangeTextDocumentParams) -> None:
-    """Re-check a template once its buffer settles, before it is saved."""
+    """Re-write the stub from the live buffer once it settles, before the template is saved."""
     _publish_debounced(server, params.text_document.uri)
 
 
 @SERVER.feature(t.TEXT_DOCUMENT_DID_SAVE)
 def did_save(server: LanguageServer, params: t.DidSaveTextDocumentParams) -> None:
-    """Re-check a template when it is saved."""
+    """Re-write the stub when the template is saved."""
     _publish(server, params.text_document.uri)
+
+
+@SERVER.feature(t.TEXT_DOCUMENT_DID_CLOSE)
+def did_close(server: LanguageServer, params: t.DidCloseTextDocumentParams) -> None:
+    """Put the stub back to what the saved template says, discarding any abandoned edit."""
+    _cancel_pending(params.text_document.uri)
+    _publish(server, params.text_document.uri)
+
+
+def _cancel_pending(uri: str) -> None:
+    with _PENDING_LOCK:
+        pending = _PENDING.pop(uri, None)
+    if pending is not None:
+        pending.cancel()
 
 
 def _document_source(server: LanguageServer, uri: str) -> str | None:
@@ -280,8 +322,8 @@ def hover(server: LanguageServer, params: t.HoverParams) -> t.Hover | None:
 
 @SERVER.feature(t.SHUTDOWN)
 def shutdown(_server: LanguageServer, _params: object) -> None:
-    """Stop the pyright connection member completion holds open."""
-    RESOLVER.shutdown()
+    """Stop the language server connection member completion holds open."""
+    resolver().shutdown()
 
 
 def main() -> None:
@@ -289,7 +331,7 @@ def main() -> None:
     try:
         SERVER.start_io()
     finally:
-        RESOLVER.shutdown()
+        resolver().shutdown()
 
 
 if __name__ == '__main__':

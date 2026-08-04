@@ -88,4 +88,4 @@ def test_cursor_after_a_dot_never_falls_back_to_name_completion():
 def test_resolver_returns_empty_when_the_language_server_is_missing(monkeypatch):
     monkeypatch.setattr('types_for_jinja.members.shutil.which', lambda _name: None)
 
-    assert MemberResolver(Path.cwd()).members('_tj_probe = "".') == []
+    assert MemberResolver(Path.cwd(), Path('_tj_probe.py')).members('_tj_probe = "".') == []

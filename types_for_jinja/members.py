@@ -22,7 +22,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-_PROBE_NAME = '_tj_probe.py'
 _TIMEOUT_SECONDS = 10.0
 
 __all__ = ['Member', 'MemberResolver']
@@ -44,9 +43,15 @@ class MemberResolver:
     ``shutdown`` when finished, after which the resolver must not be reused.
     """
 
-    def __init__(self, root: Path) -> None:
-        """Bind the resolver to ``root``; no server starts until the first query."""
+    def __init__(self, root: Path, probe: Path) -> None:
+        """Bind the resolver to ``root``; no server starts until the first query.
+
+        ``probe`` is where the throwaway module is claimed to live, relative to ``root`` or
+        absolute. It must sit inside the generated stub tree, because the probe imports the
+        generated filter signatures relatively and a checker resolves that from the path.
+        """
         self._root = root.resolve()
+        self._probe = probe if probe.is_absolute() else self._root / probe
         self._lock = threading.Lock()
         self._process: subprocess.Popen[bytes] | None = None
         self._next_id = 1
@@ -71,7 +76,7 @@ class MemberResolver:
 
     def _query(self, source: str) -> list[Member]:
         process = self._ensure_started()
-        uri = (self._root / _PROBE_NAME).as_uri()
+        uri = self._probe.as_uri()
         self._version += 1
         method = 'textDocument/didOpen' if self._version == 1 else 'textDocument/didChange'
         self._notify(process, method, _document_params(uri, source, self._version))

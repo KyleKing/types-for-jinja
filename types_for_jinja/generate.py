@@ -15,6 +15,7 @@ from jinja2 import TemplateSyntaxError
 
 from types_for_jinja import filters, manifest
 from types_for_jinja.config import Config, load_config
+from types_for_jinja.diagnostic import Diagnostic
 from types_for_jinja.emit import (
     depth_of,
     flat_name,
@@ -24,10 +25,10 @@ from types_for_jinja.emit import (
     stale_files,
     write_files,
 )
-from types_for_jinja.header import parse_header
+from types_for_jinja.header import header_errors, parse_header
 from types_for_jinja.layout import layout
 from types_for_jinja.suppress import annotate
-from types_for_jinja.transpile import UnsupportedTemplateError, transpile
+from types_for_jinja.transpile import UnsupportedTemplateError, build_environment, transpile
 
 _SIDECAR_SUFFIX = '_tj_shared'
 
@@ -69,18 +70,56 @@ class Generated:
         return {manifest.relative(template, root) for template in looked_at}
 
 
-def generate(templates: list[Path], out_dir: Path, config: Config | None = None) -> Generated:
-    """Build stubs for ``templates``, laid out under ``out_dir``."""
+def generate(
+    templates: list[Path],
+    out_dir: Path,
+    config: Config | None = None,
+    sources: dict[Path, str] | None = None,
+) -> Generated:
+    """Build stubs for ``templates``, laid out under ``out_dir``.
+
+    ``sources`` overrides what a template's text is taken to be, which is how the language
+    server checks an unsaved buffer against the same code path as the CLI.
+    """
     resolved = config or load_config(Path.cwd())
     stubs: list[Stub] = []
     skipped: list[tuple[Path, str]] = []
     for template in templates:
-        outcome = _stub_for(template, out_dir, resolved)
+        outcome = _stub_for(template, out_dir, resolved, (sources or {}).get(template))
         if isinstance(outcome, str):
             skipped.append((template, outcome))
         else:
             stubs.append(outcome)
     return Generated(out_dir=out_dir, stubs=stubs, skipped=skipped)
+
+
+def diagnose(source: str, template: Path, config: Config) -> list[Diagnostic]:
+    """Report what stops ``template`` producing a checkable stub, empty when nothing does.
+
+    These are the only diagnostics types-for-jinja raises itself. Everything about the types
+    inside the template comes from the project's own checker reading the generated stub.
+    """
+    header = parse_header(source, config.syntax)
+    if header is None:
+        return [Diagnostic(template, 1, 1, 'warning', 'no {#def ... #} type header; skipped', 'no-header')]
+    malformed = header_errors(header)
+    if malformed:
+        return [Diagnostic(template, header.lineno, 1, 'error', message, 'bad-header') for message in malformed]
+    outcome = _stub_for(template, Path(config.out_dir), config, source)
+    if not isinstance(outcome, str):
+        return []
+    line = _syntax_error_line(source, config) if outcome.startswith('template syntax') else header.lineno
+    severity = 'error' if outcome.startswith('template syntax') else 'warning'
+    return [Diagnostic(template, line, 1, severity, outcome, 'skipped')]
+
+
+def _syntax_error_line(source: str, config: Config) -> int:
+    """Where Jinja's own parser gave up, so the diagnostic lands on the broken tag."""
+    try:
+        build_environment(config.syntax).parse(source)
+    except TemplateSyntaxError as err:
+        return err.lineno or 1
+    return 1
 
 
 def plan(generated: Generated) -> tuple[dict[Path, str], list[Path]]:
@@ -141,8 +180,8 @@ def _prune_empty_dirs(candidates: set[Path], out_dir: Path) -> None:
             current = current.parent
 
 
-def _stub_for(template: Path, out_dir: Path, config: Config) -> Stub | str:
-    source = template.read_text(encoding='utf-8')
+def _stub_for(template: Path, out_dir: Path, config: Config, override: str | None = None) -> Stub | str:
+    source = template.read_text(encoding='utf-8') if override is None else override
     header = parse_header(source, config.syntax)
     if header is None:
         return 'no {#def ... #} type header'

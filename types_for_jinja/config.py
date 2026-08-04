@@ -45,12 +45,22 @@ class Syntax:
     line_comment_prefix: str | None = None
 
 
+DEFAULT_OUT_DIR = '_jinja_stubs'
+"""Where generated stubs go. Must not start with a dot, which pyright excludes by default."""
+
+
 @dataclass(frozen=True)
 class Config:
-    """Project-level context shared by every template (Jinja Environment globals)."""
+    """Project-level context shared by every template (Jinja Environment globals).
+
+    ``out_dir`` is read by both ``generate`` and the language server, which have to agree:
+    the server writes the live buffer's stub where the project's own checker is already
+    looking.
+    """
 
     imports: list[str] = field(default_factory=list)
     globals: list[tuple[str, str]] = field(default_factory=list)
+    out_dir: str = DEFAULT_OUT_DIR
     suppression: str = 'portable'
     template_dirs: list[str] = field(default_factory=list)
     wrapper: WrapperConfig = field(default_factory=WrapperConfig)
@@ -69,11 +79,26 @@ def load_config(root: Path) -> Config:
     return Config(
         imports=list(table.get('imports', [])),
         globals=[(name, type_str) for name, type_str in declared.items()],
+        out_dir=_out_dir(table.get('out_dir', DEFAULT_OUT_DIR)),
         suppression=_suppression(table.get('suppression', 'portable')),
         template_dirs=list(table.get('template_dirs', [])),
         wrapper=WrapperConfig(**_known(WrapperConfig, table.get('wrapper', {}))),
         syntax=Syntax(**_known(Syntax, table.get('syntax', {}))),
     )
+
+
+def _out_dir(value: str) -> str:
+    """Reject an output directory a checker would silently skip or cannot import as a package.
+
+    pyright excludes ``**/.*`` by default and would report a clean run over zero files, and
+    the generated stubs import each other relatively, which needs every path segment to be a
+    usable module name.
+    """
+    parts = Path(value).parts
+    if not parts or any(not part.isidentifier() for part in parts):
+        msg = f'out_dir {value!r} must be a relative path whose every segment is a Python identifier'
+        raise ValueError(msg)
+    return value
 
 
 def _suppression(value: str) -> str:
