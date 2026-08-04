@@ -164,9 +164,9 @@ v1 is a checker that is quiet (globals), scriptable (JSON/SARIF), and drops into
 ### Status (current build)
 
 - Shipped (v1): the checker (undefined variables plus attribute and item access), the CLI with `--format text|json|sarif`, the Environment globals declaration, a pre-commit hook, and hardening (template-syntax and missing-pyright handling, broader Jinja coverage).
-- Shipped (v1.1): the LSP with Neovim integration, live unsaved-buffer checking (debounced so pyright does not queue behind keystrokes), and completion and hover for the typed context's own names, scoped per line and tolerant of the half-typed buffer that completion runs against; macro bodies (body checked, calls get arity checking); cross-file `{% extends %}` base-context and `{% import %}`/`{% from import %}` macro resolution; stable rule codes (`TJ###`) with inline `{# type: ignore #}` suppression.
+- Shipped (v1.1): the LSP with Neovim integration, live unsaved-buffer checking (debounced so pyright does not queue behind keystrokes), and completion and hover for the typed context's own names, scoped per line and tolerant of the half-typed buffer that completion runs against; macro bodies, with a macro's own `{#def #}` block typing its parameters for its body and its callers across files; cross-file `{% extends %}` base-context and `{% import %}`/`{% from import %}` macro resolution; stable rule codes (`TJ###`) with inline `{# type: ignore #}` suppression.
 - Shipped (v1.1): `types-for-jinja wrapper`, which writes one typed render function per template with `--check` for CI, reads `[tool.types_for_jinja.wrapper]`, and takes a `--return-type` so a framework response class replaces `Markup`. Level-2 enforcement (`--validator beartype|pydantic`) rides on the same command; `examples/runtime` remains the runnable proof of both validators.
-- Deferred: typed macro params (a bad attribute on a param inside a macro body is not yet caught), `{% include %}` context flow, multi-level `extends`, and full filter type signatures (filter results are `Any`).
+- Deferred: `{% include %}` context flow, multi-level `extends`, and full filter type signatures (filter results are `Any`).
 
 ## Scope
 
@@ -185,7 +185,6 @@ v1 is a checker that is quiet (globals), scriptable (JSON/SARIF), and drops into
 
 - Attribute completion after a `.`, which needs the declared type resolved rather than just named. The context's own names now complete and hover (see Status); the base expression is already parsed out and handed to the completion handler, so what remains is asking a type checker what members that expression has.
 - General Jinja language features in the LSP: tag and filter completions, hover docs for built-ins. [typed-htmx](https://github.com/Desdaemon/typed-htmx) is the reference point, it types htmx attributes for JSX completions the same way.
-- Typed macro params, so a bad attribute on a param inside a macro body is caught
 - `{% include %}` cross-template context, multi-level `{% extends %}` chains
 - Full filter and test type signatures (results are `Any` today)
 - Extension-tag declaration (rung 2)

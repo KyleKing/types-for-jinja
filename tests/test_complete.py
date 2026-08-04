@@ -47,6 +47,16 @@ def test_configured_globals_are_offered():
     assert _names(9, config)['static_url'].origin == 'global'
 
 
+def test_declared_macro_parameters_carry_their_type():
+    source = '{#def\nx: int\n#}\n{% macro card(title) %}\n{#def\ntitle: str\n#}\n{{ title }}\n{% endmacro %}\n'
+    header = parse_header(source)
+    assert header is not None
+
+    inside = {entry.name: entry for entry in context_names(source, header, line=8)}
+
+    assert describe(inside['title']) == 'title: str (macro parameter)'
+
+
 def test_macro_parameters_are_visible_in_the_macro_body():
     source = '{#def\nx: int\n#}\n{% macro card(title, href) %}\n  {{ title }}\n{% endmacro %}\n'
     header = parse_header(source)

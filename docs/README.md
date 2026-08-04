@@ -34,6 +34,20 @@ templates/greeting.html:8:14 error: Cannot access attribute "titel" for class "I
 
 The `{#def #}` block is a plain Jinja comment, so the template renders exactly as before. The loop variable is narrowed to its element type, so `item.titel` is caught the same way `user.naem` is.
 
+A macro takes its own `{#def #}` block, which types its parameters for both its body and its callers, across files:
+
+```jinja
+{% macro field(label, value) %}
+  {#def
+  label: str
+  value: str
+  #}
+  <label>{{ label }}</label><span>{{ value }}</span>
+{% endmacro %}
+```
+
+Without that block the parameters stay untyped and only arity is checked.
+
 ## Installation
 
 ```console

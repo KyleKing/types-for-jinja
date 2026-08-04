@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from types_for_jinja.check import check_source
-from types_for_jinja.header import header_errors, parse_header
+from types_for_jinja.header import header_errors, parse_defs, parse_header
 
 _COLLAPSED = '{#def from examples.models import User user: User #}\n<h1>{{ user.name }}</h1>\n'
 
@@ -40,3 +40,20 @@ def test_malformed_header_short_circuits_the_checker(tmp_path):
     diagnostics = check_source(_COLLAPSED, Path('t.html.jinja'), cache_dir=tmp_path)
 
     assert [(d.line, d.code) for d in diagnostics] == [(1, 'TJ011')]
+
+
+def test_macros_only_file_has_no_template_header():
+    """A block after the first {% macro %} types that macro, not the file."""
+    source = '{% macro field(label) %}\n{#def\nlabel: str\n#}\n{{ label }}\n{% endmacro %}\n'
+
+    assert parse_header(source) is None
+    assert len(parse_defs(source)) == 1
+
+
+def test_template_header_still_wins_when_it_comes_first():
+    source = '{#def\nname: str\n#}\n{% macro field(label) %}\n{#def\nlabel: str\n#}\n{% endmacro %}\n'
+
+    header = parse_header(source)
+
+    assert header is not None
+    assert header.params == [('name', 'str')]

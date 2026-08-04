@@ -1,4 +1,8 @@
-"""Parse the ``{#def ... #}`` type header from a Jinja template."""
+"""Parse ``{#def ... #}`` type declarations from a Jinja template.
+
+The first one is the template's own context header. A later one inside a
+``{% macro %}`` body types that macro's parameters.
+"""
 
 from __future__ import annotations
 
@@ -7,6 +11,7 @@ import re
 from dataclasses import dataclass
 
 _HEADER_RE = re.compile(r'\{#-?\s*def\b(?P<body>.*?)-?#\}', re.DOTALL)
+_MACRO_RE = re.compile(r'\{%-?\s*macro\b')
 
 
 @dataclass(frozen=True)
@@ -19,11 +24,26 @@ class TemplateHeader:
 
 
 def parse_header(source: str) -> TemplateHeader | None:
-    """Return the first ``{#def ... #}`` header in ``source``, or ``None`` if absent."""
+    """Return the template's own ``{#def ... #}`` header, or ``None`` if it has none.
+
+    A block that follows the first ``{% macro %}`` types that macro's parameters, not the
+    template, so a macros-only file reports no header rather than borrowing one.
+    """
     match = _HEADER_RE.search(source)
     if match is None:
         return None
-    lineno = source.count('\n', 0, match.start()) + 1
+    macro = _MACRO_RE.search(source)
+    if macro is not None and macro.start() < match.start():
+        return None
+    return _parse_block(match, source)
+
+
+def parse_defs(source: str) -> list[TemplateHeader]:
+    """Return every ``{#def ... #}`` declaration in ``source``, in source order."""
+    return [_parse_block(match, source) for match in _HEADER_RE.finditer(source)]
+
+
+def _parse_block(match: re.Match[str], source: str) -> TemplateHeader:
     imports: list[str] = []
     params: list[tuple[str, str]] = []
     for raw in match.group('body').splitlines():
@@ -35,7 +55,7 @@ def parse_header(source: str) -> TemplateHeader | None:
         elif ':' in line:
             name, type_str = line.split(':', 1)
             params.append((name.strip(), type_str.strip()))
-    return TemplateHeader(imports=imports, params=params, lineno=lineno)
+    return TemplateHeader(imports=imports, params=params, lineno=source.count('\n', 0, match.start()) + 1)
 
 
 def header_errors(header: TemplateHeader) -> list[str]:
