@@ -11,6 +11,7 @@ import pytest
 
 from types_for_jinja.cli import main
 from types_for_jinja.config import DEFAULT_OUT_DIR, Config, load_config
+from types_for_jinja.transpile import UnsupportedTemplateError
 
 from .backends import STUB_DIR
 from .checked import skipped, write_template
@@ -32,11 +33,14 @@ def test_a_jinja_syntax_error_is_an_error():
     assert 'syntax error' in diagnostics[0].message
 
 
-def test_an_unsupported_construct_is_a_warning():
+def test_an_unsupported_construct_is_a_warning(monkeypatch):
     """One template the transpiler cannot model must not stop the others being generated."""
-    source = '{#def x: int #}\n{% set ns = namespace(n=0) %}\n{% set ns.n = 1 %}\n'
+    monkeypatch.setattr(
+        'types_for_jinja.generate.transpile',
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(UnsupportedTemplateError('OddNode')),
+    )
 
-    diagnostics = skipped(source, Path('ns.html'))
+    diagnostics = skipped('{#def x: int #}\n{{ x }}\n', Path('odd.html'))
 
     assert [d.severity for d in diagnostics] == ['warning']
     assert 'unsupported template construct' in diagnostics[0].message

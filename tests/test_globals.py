@@ -63,3 +63,41 @@ def test_an_undeclared_global_is_reported(examples_project):
     found = reported(_USES_GLOBALS, Config(out_dir=STUB_DIR))
 
     assert any(entry.mentions('static_url') for entry in found)
+
+
+@requires_checker(checked.DEFAULT_BACKEND)
+def test_jinjas_own_globals_are_declared_when_a_template_names_one(project):
+    """``namespace`` and friends come from the Environment, so a template never declares them."""
+    template = checked.write_template(
+        'templates/ns.html.jinja',
+        '{#def\nitems: list[str]\n#}\n{% set ns = namespace(total=0) %}\n'
+        '{% for i in items %}{% set ns.total = ns.total + 1 %}{% endfor %}\n'
+        '<p>{{ ns.total }}{{ cycler("a").next() }}{{ lipsum() }}{{ joiner() }}</p>\n',
+    )
+
+    assert reported(template, Config(out_dir=STUB_DIR)) == []
+
+
+def test_a_jinja_global_is_only_declared_when_it_is_used():
+    """Declaring all of them always would fight a project that declares its own ``namespace``."""
+    from types_for_jinja.transpile import transpile  # ruff:ignore[import-outside-top-level]
+
+    source = '{#def\nx: str\n#}\n<p>{{ x }}</p>\n'
+    header = parse_header(source)
+    assert header is not None
+
+    assert 'namespace' not in transpile(source, header).code
+
+
+def test_a_project_declaration_replaces_the_injected_jinja_global():
+    from types_for_jinja.transpile import transpile  # ruff:ignore[import-outside-top-level]
+
+    source = '{#def\nx: str\n#}\n{% set ns = namespace(n=1) %}\n'
+    header = parse_header(source)
+    assert header is not None
+    config = Config(imports=['from collections.abc import Callable'], globals=[('namespace', 'Callable[..., object]')])
+
+    code = transpile(source, header, config).code
+
+    assert 'namespace: Callable[..., object]' in code
+    assert 'namespace: _TJAny' not in code

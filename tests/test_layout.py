@@ -10,7 +10,7 @@ from types_for_jinja.config import Config
 from types_for_jinja.generate import generate
 from types_for_jinja.header import parse_header
 from types_for_jinja.layout import layout
-from types_for_jinja.transpile import transpile
+from types_for_jinja.transpile import UnsupportedTemplateError, transpile
 
 _EXAMPLES = Path('examples')
 
@@ -63,15 +63,32 @@ def test_multi_statement_branch_still_has_no_aligned_form():
     assert _aligned(source) is None
 
 
-def test_unsupported_construct_skips_one_template(tmp_path):
-    """A namespace assignment used to raise out of transpile and take down the whole run."""
-    source = '{#def\nname: str\n#}\n{% set ns = namespace(n=0) %}\n{% set ns.n = 1 %}\n'
+def test_a_namespace_assignment_has_an_aligned_form(tmp_path):
+    """``{% set ns.n = 1 %}`` used to raise out of transpile and skip the whole template."""
+    source = '{#def\nname: str\n#}\n{% set ns = namespace(n=0) %}\n{% set ns.n = 1 %}\n{{ ns.n }}\n'
     template = tmp_path / 'ns.html.jinja'
     template.write_text(source, encoding='utf-8')
 
-    generated = generate([Path('examples/templates/greeting_bad.html.jinja'), template], tmp_path / 'out')
+    generated = generate([template], tmp_path / 'out')
 
-    assert [reason for path, reason in generated.skipped if path == template] == [
-        'unsupported template construct: NSRef'
-    ]
+    assert generated.skipped == []
+    assert 'ns.n = 1' in generated.stubs[0].files[generated.stubs[0].path]
+
+
+def test_an_unsupported_construct_skips_one_template_not_the_run(tmp_path, monkeypatch):
+    """One template the transpiler cannot model must not stop the others being generated."""
+    real = transpile
+
+    def refuse(source, header, config=None, template_path=None, depth=0):
+        if template_path is not None and template_path.name == 'odd.html.jinja':
+            raise UnsupportedTemplateError('OddNode')
+        return real(source, header, config, template_path, depth)
+
+    monkeypatch.setattr('types_for_jinja.generate.transpile', refuse)
+    odd = tmp_path / 'odd.html.jinja'
+    odd.write_text('{#def\nname: str\n#}\n{{ name }}\n', encoding='utf-8')
+
+    generated = generate([Path('examples/templates/greeting_bad.html.jinja'), odd], tmp_path / 'out')
+
+    assert [reason for path, reason in generated.skipped if path == odd] == ['unsupported template construct: OddNode']
     assert generated.stubs

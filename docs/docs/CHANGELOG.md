@@ -2,6 +2,7 @@
 
 ### Feat
 
+- **config**: declare jinja2 extensions so their tags parse
 - **components**: check JinjaX component tags against their own header
 - **header**: read JinjaX's one-line form, defaults, and untyped names
 - **lsp**: resolve members through any Python language server

@@ -35,6 +35,13 @@ _CMP_OPS = {
 _ANY = '_TJAny'
 """What an untyped header name is annotated as; the preamble imports ``Any`` under this alias."""
 
+JINJA_GLOBALS = ('cycler', 'joiner', 'lipsum', 'namespace')
+"""Globals Jinja puts in every Environment, which are otherwise undefined variables.
+
+Declared only when a template names one, so a project free to declare its own ``namespace``
+under ``[tool.types_for_jinja]`` is not fighting a duplicate binding.
+"""
+
 MacroTypes = dict[int, dict[str, str]]
 """Declared parameter types for each ``{% macro %}``, keyed by the macro's line number."""
 
@@ -164,14 +171,18 @@ def transpile(
     split = _split_top_level(tree, ctx)
 
     uses, component_defs = _component_uses(source, ctx.search_dirs)
-    lines = _preamble(header, config, [*macro_imports, *split.imports, *filter_imports(tree, depth)])
+    lines = _preamble(
+        header,
+        config,
+        [*macro_imports, *split.imports, *filter_imports(tree, depth)],
+        _jinja_globals(tree, config),
+    )
     preamble_len = len(lines)
     lines.extend(_mark_foreign(component_defs, header.lineno))
     lines.extend(split.foreign_defs)
     lines.extend(split.module_defs)
 
-    signature = ', '.join(param.annotated(_ANY) for param in header.params)
-    lines.append(Line(0, f'def _render({signature}) -> None:', header.lineno))
+    lines.append(Line(0, f'def _render({_signature(header)}) -> None:', header.lineno))
     body: list[Line] = []
     _emit_body(split.render_nodes, body, 1, ctx)
     inherited: list[Line] = []
@@ -227,7 +238,23 @@ def _split_top_level(tree: nodes.Template, ctx: _Emit) -> _TopLevel:
     return split
 
 
-def _preamble(header: TemplateHeader, config: Config, extra_imports: list[str]) -> list[Line]:
+def _signature(header: TemplateHeader) -> str:
+    return ', '.join(param.annotated(_ANY) for param in header.params)
+
+
+def _jinja_globals(tree: nodes.Template, config: Config) -> list[str]:
+    """Jinja's own globals this template names, minus any the project already declares."""
+    declared = {name for name, _ in config.globals}
+    used = {node.name for node in tree.find_all(nodes.Name)}
+    return [name for name in JINJA_GLOBALS if name in used and name not in declared]
+
+
+def _preamble(
+    header: TemplateHeader,
+    config: Config,
+    extra_imports: list[str],
+    jinja_globals: list[str] | None = None,
+) -> list[Line]:
     param_names = {param.name for param in header.params}
     declared = _unique([*header.imports, *config.imports, *extra_imports])
     lines = [Line(0, imp, header.lineno) for imp in declared]
@@ -244,9 +271,10 @@ def _preamble(header: TemplateHeader, config: Config, extra_imports: list[str]) 
         Line(0, f'{name}: {type_str}', header.lineno) for name, type_str in config.globals if name not in param_names
     )
     declared_globals = {name for name, _ in config.globals}
+    injected = [*_extension_globals(config), *(jinja_globals or ())]
     lines.extend(
         Line(0, f'{name}: _TJAny', header.lineno)
-        for name in _extension_globals(config)
+        for name in dict.fromkeys(injected)
         if name not in param_names and name not in declared_globals
     )
     return lines
@@ -626,6 +654,8 @@ def _target(node: nodes.Node) -> str:
             return _ident(node.name)
         case nodes.Tuple():
             return ', '.join(_target(item) for item in node.items)
+        case nodes.NSRef():
+            return f'{_ident(node.name)}.{node.attr}'
         case _:
             raise UnsupportedTemplateError(type(node).__name__)
 

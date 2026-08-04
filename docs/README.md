@@ -107,7 +107,7 @@ A tag an extension adds does not parse until the extension is loaded, and an unp
 extensions = ["do", "i18n", "loopcontrols"]
 ```
 
-`i18n` also declares the names it injects (`_`, `gettext`, `ngettext`, `pgettext`, `npgettext`), so a template using them needs nothing else.
+`i18n` also declares the names it injects (`_`, `gettext`, `ngettext`, `pgettext`, `npgettext`), so a template using them needs nothing else. Jinja's own globals (`namespace`, `cycler`, `joiner`, `lipsum`) are declared automatically when a template names one, including the `{% set ns.total = ... %}` form.
 
 Jinja's built-in filters carry their return type, so a filtered expression is still checked: `{{ items | length }}` is an `int`, and `{% for x in items | sort %}` still knows what `x` is. Only the return type is pinned, because a filter catalog that guesses at argument types reports errors on correct templates. A filter the catalog does not know (yours, or one from an extension) falls back to `Any`.
 

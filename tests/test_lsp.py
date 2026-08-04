@@ -16,6 +16,7 @@ from pygls.lsp.server import LanguageServer
 
 from types_for_jinja.config import Config
 from types_for_jinja.lsp import _publish, _publish_debounced, did_close, remap_positions, stub_for, sync_stub
+from types_for_jinja.transpile import UnsupportedTemplateError
 
 from . import backends
 from .backends import STUB_DIR, TEMPLATE_PATH
@@ -95,11 +96,22 @@ def test_a_jinja_syntax_error_lands_on_the_broken_tag(project, config):
     assert 'syntax error' in diagnostics[0].message
 
 
-def test_an_unsupported_construct_is_a_warning_not_a_failure(project, config):
-    """One template the transpiler cannot model must not take the rest of the editor down."""
-    source = '{#def\nx: str\n#}\n{% set ns = namespace(n=0) %}\n{% set ns.n = 1 %}\n'
+def test_a_namespace_template_is_checked_rather_than_skipped(project, config):
+    """It used to be skipped whole, which hid every other error in the file."""
+    source = '{#def\nx: str\n#}\n{% set ns = namespace(n=0) %}\n{% set ns.n = 1 %}\n<p>{{ ns.n }}</p>\n'
 
-    diagnostics = sync_stub(source, Path('templates/ns.html.jinja'), config)
+    assert sync_stub(source, Path('templates/ns.html.jinja'), config) == []
+    assert 'ns.n = 1' in (project / STUB_DIR / 'templates/ns_html_jinja.py').read_text(encoding='utf-8')
+
+
+def test_an_unsupported_construct_is_a_warning_not_a_failure(project, config, monkeypatch):
+    """One template the transpiler cannot model must not take the rest of the editor down."""
+    monkeypatch.setattr(
+        'types_for_jinja.generate.transpile',
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(UnsupportedTemplateError('OddNode')),
+    )
+
+    diagnostics = sync_stub('{#def\nx: str\n#}\n<p>{{ x }}</p>\n', Path('templates/odd.html.jinja'), config)
 
     assert [d.severity for d in diagnostics] == [t.DiagnosticSeverity.Warning]
     assert 'unsupported template construct' in diagnostics[0].message

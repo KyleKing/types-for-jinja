@@ -11,6 +11,5 @@ JinjaX is where the `{#def #}` header comes from, so its templates should check 
 Beyond JinjaX:
 
 1. **Extension tags.** `{% trans %}`, `{% do %}`, and `{% break %}` fail `Environment.parse` when the extension is not loaded, so those templates are skipped today. Add `[tool.types_for_jinja] extensions = [...]`, loaded into the parsing Environment. The stock extensions ship inside jinja2, so the dependency list is unchanged. Enabling i18n also injects `_`, `gettext`, and `ngettext` as known globals.
-1. **`namespace()`.** `{% set ns.count = 1 %}` currently skips the whole template. Model `namespace` as a known global whose result accepts any attribute, so the rest of the template still checks.
 1. **Discovery.** `_iter_templates` globs only `*.html` and `*.jinja`. Add `*.j2`, a `template_globs` setting, and a fallback to `template_dirs` when no paths are given.
 1. **Copier and Cookiecutter** need only what exists: configured delimiters, `template_dirs`, and declared globals. Confirm that with an integration test over a realistic layout of each.
