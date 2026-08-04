@@ -83,12 +83,12 @@ Two rows moved in the 2026-08 pivot below: the stub is written rather than disca
 
 ## Direction (2026-08): generate-only on a jinja2-only core
 
-Decided after BACKENDS.md proved pyright, ty, and mypy read the aligned stubs identically. `types-for-jinja generate` becomes the product and `check` is removed. The runtime dependency list shrinks to `jinja2` alone (corallium moves to the dev group; only tests use it). types-for-jinja never invokes a type checker: it writes Python, and the project's own checker reports template errors, under the project's own configuration, in the run it already does. The pitch changes from "a checker for templates" to "your checker now covers templates".
+Decided after the backend evidence (below) proved pyright, ty, and mypy read the aligned stubs identically. `types-for-jinja generate` becomes the product and `check` is removed. The runtime dependency list shrinks to `jinja2` alone (corallium moves to the dev group; only tests use it). types-for-jinja never invokes a type checker: it writes Python, and the project's own checker reports template errors, under the project's own configuration, in the run it already does. The pitch changes from "a checker for templates" to "your checker now covers templates".
 
 ### What this buys
 
 - The stub is checked under the project's own checker settings. `check` wrote a fresh `pyrightconfig.json`, so the mypy pydantic plugin, custom stub paths, and strictness options never applied to template checks. With generate they all do, which closes the last item in "Open questions".
-- No pyright-on-PATH requirement, no per-file subprocess, no `PyrightNotFoundError` path. The user's checker pays one startup and keeps its incremental cache. BACKENDS.md measured the per-file floor at roughly 480ms for pyright and 49ms for ty; generate writes files and gets batching for free.
+- No pyright-on-PATH requirement, no per-file subprocess, no `PyrightNotFoundError` path. The user's checker pays one startup and keeps its incremental cache. The measured per-file floor is roughly 480ms for pyright and 49ms for ty; generate writes files and gets batching for free.
 - Diagnostics carry the checker's native rule codes, so per-code suppression, baselines, and editor quick-fixes behave exactly as they do for the rest of the codebase. The TJ catalog and its cross-backend portability problem disappear with the subprocess that made them necessary.
 - CI, pre-commit, and the editor converge on one mechanism: fresh stubs, checked by whatever already checks the repo.
 
@@ -111,14 +111,14 @@ Ordered so each step lands independently. `check` is deleted last, after its rep
 1. **LSP diagnostics without a checker.** The LSP stops invoking pyright. On open, save, and debounced change it re-transpiles the live buffer and writes the stub into the stubs tree. The user's Python language server watches the workspace, re-checks the changed file inside its incremental session, and its diagnostics land in the stub. The pygls server keeps the features that need no checker at all: context-name completion, filter, test, and tag completion, and hover, all jinja2-only.
 1. **Editor mirroring.** A thin client-side layer republishes stub diagnostics onto the template buffer, line for line: an autocmd on `DiagnosticChanged` for the stubs tree in `editors/nvim`, and a small VS Code extension doing the same through `languages.onDidChangeDiagnostics`. Mirroring must live client-side because one LSP server cannot observe another server's diagnostics. Until it lands, errors appear in the stub with the right line, one click from the template.
 1. **Attribute completion backend.** `MemberResolver` hardcodes `pyright-langserver`. Generalize discovery to any LSP-speaking checker (`ty server` once its completions stabilize) and return no member items when none is found; completion is additive, so absence stays quiet.
-1. **Delete `check`.** Remove `check.py`, `codes.py`, `report.py`, and the `.types_for_jinja_cache` layout. Rewrite the pyright-gated tests (BACKENDS.md counts seven files plus literal-rule-name asserts) against generated stubs and `tests/test_backends.py`. The `suppression` machinery stays; `generate` is its consumer.
-1. **Docs.** README rewritten (done pre-emptively), a closing note in BACKENDS.md, CHANGELOG entry.
+1. **Delete `check`.** Remove `check.py`, `codes.py`, `report.py`, and the `.types_for_jinja_cache` layout. Rewrite the pyright-gated tests (seven files gate on `shutil.which('pyright')`, and `tests/test_v11_crossfile.py`, `tests/test_v11_macro.py`, and `tests/test_v1_realworld.py` assert on literal pyright rule names) against generated stubs and `tests/test_backends.py`. The `suppression` machinery stays; `generate` is its consumer.
+1. **Docs.** README rewritten and BACKENDS.md merged into "Backend evidence" below (both done pre-emptively), CHANGELOG entry, and docs/BLUE_SKY.md holding the unscheduled items.
 
 ### File and line fidelity
 
-Lines are exact: the aligned layout makes generated line N template line N, and the two residual causes BACKENDS.md measured were fixed. What remains:
+Lines are exact: the aligned layout makes generated line N template line N, and the two residual causes measured in "Backend evidence" were fixed. What remains:
 
-- The **path** names the stub. No Python checker honors a `//line`-style directive, so `remap` covers CI and mirroring covers editors. Worth one upstream ask (a `# file:` pragma in ty, whose diagnostics are still moving), the same advocacy rung as the Pallets one; do not block on it.
+- The **path** names the stub. No Python checker honors a `//line`-style directive, so `remap` covers CI and mirroring covers editors. The upstream ask (a `# file:` pragma, ty first) lives in docs/BLUE_SKY.md; do not block on it.
 - The **column** points into the stub line. Aligned stubs keep template expressions nearly verbatim, so `remap` and the mirror search for the expression text on the template line and keep the stub column when the search misses.
 - The rare template with no aligned form keeps `# L` markers, which `remap` reads from the stub file.
 
@@ -138,6 +138,68 @@ Beyond JinjaX:
 - **Copier and Cookiecutter** need only what exists: configured delimiters, `template_dirs`, and declared globals.
 
 Still ruled out, per "Scope boundary": Ansible, Salt, dbt, engines not hosted in Python, and DTL, Mako, and Chameleon.
+
+## Backend evidence
+
+Merged from the standalone BACKENDS.md (notes from 2026-07-29, revised 2026-08-04). Measured with pyright 1.1.411, ty 0.0.61, and mypy 2.3.0 on macOS. This is the evidence the Direction above rests on, condensed so the measurements never have to be redone; what described the retired `check` subprocess is dropped.
+
+### All three checkers read the stubs identically
+
+Checked against real generated stubs (dataclass context, bad attribute, undefined name, loop variable, filter call, bad method on `int`): pyright, ty, and mypy each reported the same errors on the same template lines. `tests/test_backends.py` holds that agreement on every run, and CI sets `TYPES_FOR_JINJA_REQUIRE_CHECKERS` so a missing backend fails rather than skips.
+
+Two defects had to be fixed first, and both were invisible under pyright alone:
+
+- the stub reused one `_` name for every expression check, so mypy took its declared type from the first assignment and reported `Incompatible types in assignment` on every later one. The preamble declares `_: _TJAny`
+- the generated filter signatures had `...` bodies in a real module, which ty reports as `empty-body`. They raise instead
+
+Those two fixes took ty from 58 diagnostics to the 3 the examples are supposed to have, and mypy from 12 to the same 3.
+
+### Line alignment
+
+Measured over 126 templates (11 from `examples/`, 115 real ones from mkdocs-material): 95.2% got an exact line-aligned stub, 2.4% kept `# L` markers, and 2.4% raised `UnsupportedTemplateError`. Both remainders were addressed: single-line `{% if %}...{% else %}...{% endif %}` collapses to a conditional expression (which narrows the same way the branches did), and `UnsupportedTemplateError` skips one template with a reason rather than ending the run (`{% set ns.count = 1 %}` is the common trigger; see "namespace()" above).
+
+Five transformations got alignment from 30% to 95%, each traced to a measured failure:
+
+- hoist `loop` to the preamble so a for-body's first line is free for real statements
+- drop the `_render` placeholder `pass`, which carried the header's line number (73 of the original 78 fallbacks)
+- route cross-file macro stubs to a sidecar module, since they carry another template's line numbers
+- demote `{% if x %}{% endif %}` to `_ = x`, a simple statement that can share a physical line
+- relocate `else:`, because Jinja records no line number for `{% else %}`
+
+The preamble collapses onto the header's own line as `;`-joined simple statements, so alignment holds no matter how many imports and globals a project declares. Emitting at module level frees the indent level the template's top level needs, which means every declared name must be bound (`user: User = _tj_any`), not just annotated, or real errors disappear under `"user" is unbound`. Known gap: `loop` is bound at module level, so using `loop` outside a `{% for %}` is not flagged.
+
+The output directory must not start with a dot: pyright excludes `**/.*` by default and reports a clean run over zero files, which is why the default is `_jinja_stubs`. Stub paths mirror the template tree with only the filename mangled, because a module name cannot carry the template's extension.
+
+### What varies between backends
+
+This table is `remap`'s interface spec: everything a per-backend output parser needs.
+
+|                | ty                                                   | pyright                                  | mypy                      |
+| -------------- | ---------------------------------------------------- | ---------------------------------------- | ------------------------- |
+| import path    | `--extra-search-path DIR`                            | `extraPaths` in `pyrightconfig.json`     | `MYPYPATH` env            |
+| machine output | `--output-format gitlab` (JSON) or `concise` (regex) | `--outputjson`                           | `--output json`           |
+| line base      | 1                                                    | 0                                        | 1                         |
+| column base    | 1                                                    | 0                                        | 0                         |
+| undefined name | `unresolved-reference`                               | `reportUndefinedVariable`                | `name-defined`            |
+| bad attribute  | `unresolved-attribute`                               | `reportAttributeAccessIssue`             | `attr-defined`            |
+| bad index      | `invalid-argument-type`                              | `reportArgumentType` / `reportCallIssue` | `index` / `call-overload` |
+
+### Suppression
+
+Rule codes are not portable across backends (the same error files under a different name per checker, and the mapping is one-to-many), which is why suppression drops codes rather than translating them. Measured behaviour of a bare ignore comment:
+
+|                          | pyright    | ty         | mypy       |
+| ------------------------ | ---------- | ---------- | ---------- |
+| `# type: ignore`         | suppresses | suppresses | suppresses |
+| `# ty: ignore`           | no         | suppresses | no         |
+| `# pyright: ignore`      | suppresses | no         | no         |
+| `# type: ignore[<code>]` | suppresses | no         | suppresses |
+
+So `{# type: ignore #}` (with or without a bracketed code) emits one blanket ignore on the aligned line, spelled per `[tool.types_for_jinja] suppression`: `portable` (the default, `# type: ignore`), or `mypy`, `pyright`, `ty`. An unknown value is rejected at config load, because a silent fallback would emit comments the project's checker does not honour. Stacking (`# type: ignore  # ty: ignore`) was ruled out because ty reports `unused-ignore-comment` on the second directive. On an unaligned fallback line the ignore goes in front of the `# L<n>` marker, since a checker only honours the directive when it opens the comment.
+
+### Performance
+
+Startup dominates per-file checking: the floor is roughly 480ms per pyright invocation and 49ms per ty invocation, regardless of template size. Over 25 stubs, one batched invocation beat 25 separate ones 24x (pyright, 12.02s to 0.498s) and 33x (ty, 1.22s to 0.037s), with identical diagnostics. `generate` collects the whole win by construction: the user's checker pays one startup over the stub tree and keeps its own incremental cache. Neither checker benefits from added process-level parallelism; both already run above 100% CPU batched. To reproduce: 25 stubs shaped like transpiler output, each with one deliberate bad attribute, shell loop versus single directory invocation, confirming equal diagnostic counts before trusting timings.
 
 ## How it works
 
@@ -247,13 +309,10 @@ v1 is a checker that is quiet (globals), scriptable (JSON/SARIF), and drops into
 
 **Still deferred:**
 
-- Attribute completion through a parenthesised or filtered base (`(items | first).`), which needs the fragment transpiled to Python before pyright sees it
-- Argument-level filter signatures and a catalog for third-party filters (only return types are pinned today)
-- Extension-tag declaration (rung 2)
-- Framework adapters (Flask, Django-Jinja2, FastAPI) that locate "this view renders this template with this context"
-- Sidecar/registry binding as an alternative to the header
-- Custom extensions, i18n
-- Loaders with no files behind them at all (`DictLoader`, a database), which the checker cannot read without executing the project
+- Attribute completion through a parenthesised or filtered base (`(items | first).`), which needs the fragment transpiled to Python before the language server sees it
+- Custom (project-defined) extensions beyond the stock jinja2 ones the `extensions` setting covers
+
+Everything unscheduled with no committed pathway (upstream asks, framework adapters, sidecar binding, third-party filter catalogs, `DictLoader`, rung 2, a second engine) lives in docs/BLUE_SKY.md.
 
 Ruled out entirely, per "Scope boundary": Ansible, Salt, and dbt; engines not hosted in Python; and Python engines with different lookup semantics (DTL, Mako, Chameleon).
 
@@ -276,6 +335,6 @@ Two concrete gaps this surfaced, now pulled into the v1 scope above:
 
 ## Open questions
 
-- Checker config: `_write_pyright_config` writes a fresh `pyrightconfig.json`, so the stub is checked under different settings than the project's own source (mypy pydantic plugin, custom stub paths). See BACKENDS.md.
+None open. The last one (the stub being checked under a fresh `pyrightconfig.json` rather than the project's own settings) is closed by the Direction above: `generate` inherits the project's checker configuration because the project's checker is the only one that runs.
 
-Resolved, recorded so they stay settled: the wrapper's return type is configurable (`--return-type` / `return_type`), so an app returning `HTMLResponse` generates the whole function rather than only an inner render; a helper that also sets a status code or does work before rendering stays hand-written and calls the generated function. The `{#def ... #}` header survived the yak-shears migration, so no sidecar for now (sidecar binding stays on the deferred list). Globals are declared once in `[tool.types_for_jinja]` in pyproject.toml, not per template. `types-for-jinja generate` is the portable path and is verified against pyright, ty, and mypy on every CI run; pyright stays the required backend for `check`, which owns the diagnostics it prints and so keeps its own `TJ###` codes (measurements and the suppression table are in BACKENDS.md). A template ignore becomes one blanket ignore comment on the generated line, spelled per `[tool.types_for_jinja] suppression`, because per-code names differ between checkers and a wrong one fails to suppress. What no generated stub can carry is the template's own path and column: your checker names the stub, and Python has no equivalent of Go's `//line` directive for type checkers, which is why templ can do this and we cannot. The editor path has template positions already through the LSP; recovering them in CI output needs a `remap` filter over the checker's stdout. `{% import %}` macros, `{% include %}` bodies, and whole `{% extends %}` chains all resolve cross-file since v1.1.
+Resolved, recorded so they stay settled: the wrapper's return type is configurable (`--return-type` / `return_type`), so an app returning `HTMLResponse` generates the whole function rather than only an inner render; a helper that also sets a status code or does work before rendering stays hand-written and calls the generated function. The `{#def ... #}` header survived the yak-shears migration, so no sidecar for now (sidecar binding is in docs/BLUE_SKY.md). Globals are declared once in `[tool.types_for_jinja]` in pyproject.toml, not per template. `types-for-jinja generate` is the product and is verified against pyright, ty, and mypy on every CI run; `check` and its `TJ###` codes are retired per the Direction (measurements and the suppression table are in "Backend evidence"). A template ignore becomes one blanket ignore comment on the generated line, spelled per `[tool.types_for_jinja] suppression`, because per-code names differ between checkers and a wrong one fails to suppress. What no generated stub can carry is the template's own path and column: your checker names the stub, and Python has no equivalent of Go's `//line` directive for type checkers, which is why templ can do this and we cannot (the upstream ask is in docs/BLUE_SKY.md). The editor path has template positions through the mirror; CI output recovers them through `types-for-jinja remap`. `{% import %}` macros, `{% include %}` bodies, and whole `{% extends %}` chains all resolve cross-file since v1.1.

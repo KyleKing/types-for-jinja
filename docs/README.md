@@ -1,8 +1,8 @@
 # types-for-jinja
 
-Type-check your Jinja2 templates with the type checker you already run. Declare a template's context once, in a comment, and `types-for-jinja generate` writes a line-aligned Python stub for it. pyright, ty, or mypy then reports every bad variable and attribute the template touches, at the template's own line, in the same run that checks the rest of your code. There is no new template language, Jinja renders unchanged, and there is no runtime cost by default.
+A mostly invisible type checking and LSP extension for Jinja, JinjaX, and similar templates, built on the pyright, ty, or mypy you already run. Declare a template's context once, in a comment, and `types-for-jinja generate` writes a line-aligned Python stub for it. Your checker then reports every bad variable and attribute the template touches, at the template's own line, in the same run that checks the rest of your code. In the editor, the same stubs feed your Python language server, so templates get inline diagnostics, completion, and hover without a second toolchain. There is no new template language, Jinja renders unchanged, and nothing runs at render time by default.
 
-The only dependency is jinja2. types-for-jinja never invokes a type checker itself, so template checks run under your checker, your version, and your configuration, including checker plugins such as the mypy pydantic plugin.
+The only dependency is jinja2. types-for-jinja never invokes a type checker itself, so template checks run under your checker, your version, and your configuration, including checker plugins such as the mypy pydantic plugin. The "mostly" in invisible is raw CI output naming the stub instead of the template; `types-for-jinja remap` and the editor mirror close that gap, and "Limitations" lists the rest.
 
 `types-for-jinja` is deliberately narrow (Jinja2 plus the dialects Jinja's own parser reads). If your needs differ, there are alternatives to consider:
 
