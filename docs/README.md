@@ -62,7 +62,7 @@ uv add types-for-jinja      # or: pip install types-for-jinja
 
 `types-for-jinja` parses the template with Jinja's own parser, transpiles it into a small Python stub that exercises every expression, and runs pyright over that stub. Errors map back to the template's own line and column. The stub is thrown away and Jinja renders the real template unchanged, so there is nothing to migrate beyond the one-line header. Declare Environment globals (such as `static_url`) once under `[tool.types_for_jinja]` in `pyproject.toml` so the checker treats them as defined.
 
-`types-for-jinja check --format json` and `--format sarif` emit machine-readable output for CI. The SARIF report plugs into GitHub code scanning and coding agents. A pre-commit hook and an LSP (with a Neovim integration in `editors/nvim`) deliver the same diagnostics to commits and editors.
+`types-for-jinja check --format json` and `--format sarif` emit machine-readable output for CI. The SARIF report plugs into GitHub code scanning and coding agents. A pre-commit hook and an LSP (with a Neovim integration in `editors/nvim`) deliver the same diagnostics to commits and editors. The LSP also completes and describes the typed context: its names, the members of their types, Jinja's built-in filters and tests, and its tags.
 
 ## Typed render calls (optional)
 

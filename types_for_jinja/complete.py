@@ -18,7 +18,7 @@ from jinja2 import TemplateSyntaxError, nodes
 
 from types_for_jinja.config import Config, Syntax
 from types_for_jinja.header import TemplateHeader
-from types_for_jinja.transpile import MacroTypes, build_environment, deepest_line, macro_defs
+from types_for_jinja.transpile import MacroTypes, build_environment, deepest_line, macro_defs, transpile
 
 _IDENT_RUN = re.compile(r'[A-Za-z_][A-Za-z0-9_]*$')
 _WORD_AT = re.compile(r'[A-Za-z_][A-Za-z0-9_]*')
@@ -81,7 +81,7 @@ def cursor_context(line_text: str, column: int, syntax: Syntax | None = None) ->
 
 def _kind(before: str, opener: int, syntax: Syntax) -> Kind:
     """What the text left of the cursor's word says is being completed."""
-    if _dotted_base(before):
+    if before.endswith('.'):
         return 'attribute'
     inside_block = before.startswith(syntax.block_start_string, opener)
     if inside_block and not before[opener + len(syntax.block_start_string) :].strip():
@@ -114,6 +114,44 @@ def context_names(
         macro_types, _ = macro_defs(source, tree, config.syntax)
         _scan(tree.body, line, source.count('\n') + 1, found, macro_types)
     return sorted(_deduplicate(found), key=lambda entry: entry.name)
+
+
+def probe_module(source: str, header: TemplateHeader, config: Config, line: int, expression: str) -> str | None:
+    """Build a Python module that reaches ``line`` of the template, then evaluates ``expression``.
+
+    This is the transpiled stub truncated at the cursor rather than a flat list of
+    bindings, so the probe sits inside the same ``for`` and ``if`` scopes the template
+    does and a loop variable keeps the element type pyright narrowed it to.
+    """
+    repaired = _repaired(source, line, config.syntax)
+    if repaired is None:
+        return None
+    try:
+        module = transpile(repaired, header, config)
+    except TemplateSyntaxError:
+        return None
+    kept = [entry for entry in module.lines if entry.lineno <= line and not entry.foreign]
+    if not kept:
+        return None
+    last = kept[-1]
+    indent = last.indent + 1 if last.text.endswith(':') else last.indent
+    body = ['    ' * entry.indent + entry.text for entry in kept]
+    body.append('    ' * indent + f'_tj_probe = {expression}.')
+    return '\n'.join(body) + '\n'
+
+
+def _repaired(source: str, line: int, syntax: Syntax) -> str | None:
+    """The first variant of ``source`` that parses, closing or blanking the half-typed line."""
+    repairs = (lambda text: _closed(text, syntax), lambda _: '')
+    for candidate in (_with_line(source, line, repair) for repair in repairs):
+        if candidate is None:
+            continue
+        try:
+            build_environment(syntax).parse(candidate)
+        except TemplateSyntaxError:
+            continue
+        return candidate
+    return None
 
 
 def describe(entry: ContextName) -> str:

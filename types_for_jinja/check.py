@@ -20,16 +20,16 @@ from types_for_jinja.suppress import apply_suppressions
 from types_for_jinja.transpile import transpile
 
 _MARKER_RE = re.compile(r'#\s*L(\d+)\s*$')
-_CACHE_DIR = Path('.types_for_jinja_cache')
+CACHE_DIR = Path('.types_for_jinja_cache')
 
-__all__ = ['Diagnostic', 'PyrightNotFoundError', 'check_file', 'check_source']
+__all__ = ['CACHE_DIR', 'Diagnostic', 'PyrightNotFoundError', 'check_file', 'check_source', 'prepare_cache']
 
 
 class PyrightNotFoundError(RuntimeError):
     """pyright is required to run the checker but was not found on PATH."""
 
 
-def check_file(path: Path, cache_dir: Path = _CACHE_DIR) -> list[Diagnostic]:
+def check_file(path: Path, cache_dir: Path = CACHE_DIR) -> list[Diagnostic]:
     """Type-check one template on disk, returning diagnostics mapped to its own lines."""
     return check_source(path.read_text(encoding='utf-8'), path, cache_dir=cache_dir)
 
@@ -38,7 +38,7 @@ def check_source(
     source: str,
     path: Path,
     *,
-    cache_dir: Path = _CACHE_DIR,
+    cache_dir: Path = CACHE_DIR,
     config: Config | None = None,
 ) -> list[Diagnostic]:
     """Type-check template ``source`` labelled as ``path`` (used for on-disk and live buffers)."""
@@ -58,10 +58,7 @@ def _raw_diagnostics(source: str, path: Path, cache_dir: Path, config: Config | 
         module = transpile(source, header, resolved, template_path=path)
     except TemplateSyntaxError as err:
         return [Diagnostic(path, err.lineno or 1, 1, 'error', f'template syntax error: {err.message}', 'syntax-error')]
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    _write_cache_gitignore(cache_dir)
-    _write_pyright_config(cache_dir)
-    (cache_dir / f'{filters.MODULE_NAME}.py').write_text(filters.module_source(), encoding='utf-8')
+    prepare_cache(cache_dir)
     generated = cache_dir / f'{_safe_name(path)}.py'
     generated.write_text(module.code, encoding='utf-8')
     generated_lines = module.code.splitlines()
@@ -77,6 +74,15 @@ def _raw_diagnostics(source: str, path: Path, cache_dir: Path, config: Config | 
         for raw in _run_pyright(generated)
         if raw['severity'] == 'error'
     ]
+
+
+def prepare_cache(cache_dir: Path) -> Path:
+    """Make ``cache_dir`` a checkable directory: gitignored, configured, filter stubs present."""
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    _write_cache_gitignore(cache_dir)
+    _write_pyright_config(cache_dir)
+    (cache_dir / f'{filters.MODULE_NAME}.py').write_text(filters.module_source(), encoding='utf-8')
+    return cache_dir
 
 
 def _safe_name(path: Path) -> str:

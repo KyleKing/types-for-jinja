@@ -109,8 +109,8 @@ def test_complete_is_silent_outside_an_expression():
     assert complete(_SOURCE, 6, 2) == []
 
 
-def test_complete_defers_attribute_access_to_the_checker():
-    assert complete('{#def\nuser: str\n#}\n{{ user. }}\n', 3, 8) == []
+def test_complete_treats_a_trailing_dot_as_attribute_access():
+    assert cursor_context('{{ user.', 8).kind == 'attribute'
 
 
 def test_hover_reports_the_declared_type():

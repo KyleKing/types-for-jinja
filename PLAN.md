@@ -167,6 +167,7 @@ v1 is a checker that is quiet (globals), scriptable (JSON/SARIF), and drops into
 - Shipped (v1.1): the LSP with Neovim integration, live unsaved-buffer checking (debounced so pyright does not queue behind keystrokes), and completion and hover for the typed context's own names, scoped per line and tolerant of the half-typed buffer that completion runs against; macro bodies, with a macro's own `{#def #}` block typing its parameters for its body and its callers across files; cross-file `{% extends %}` base-context and `{% import %}`/`{% from import %}` macro resolution; stable rule codes (`TJ###`) with inline `{# type: ignore #}` suppression.
 - Shipped (v1.1): `types-for-jinja wrapper`, which writes one typed render function per template with `--check` for CI, reads `[tool.types_for_jinja.wrapper]`, and takes a `--return-type` so a framework response class replaces `Markup`. Level-2 enforcement (`--validator beartype|pydantic`) rides on the same command; `examples/runtime` remains the runnable proof of both validators.
 - Shipped (v1.1): `{% include %}` context flow (the include is checked against the including template's context) and multi-level `{% extends %}` chains, both cycle-safe, with cross-file errors reported at the `{% include %}` or `{% extends %}` line of the file being checked rather than at a line number from another file.
+- Shipped (v1.1): attribute completion after a `.`, delegated to `pyright-langserver` over a probe module that is the transpiled stub truncated at the cursor, so a loop variable offers its element's members. Consistent with the locked decision to write no inference engine.
 - Shipped (v1.1): LSP completions that follow the cursor, offering built-in filters after `|` (with their return type), built-in tests after `is`, and Jinja tags after `{%`, with hover for all three.
 - Shipped (v1.1): configurable delimiters (`[tool.types_for_jinja.syntax]`) and `package:subdirectory` template directories, so a Jinja superset and a `PackageLoader` layout both check.
 - Shipped (v1.1): return types for Jinja's built-in filters and tests, emitted as an importable signature module beside the generated code, so a filtered expression keeps a real type instead of collapsing to `Any`. Argument types stay `Any` on purpose; an unknown filter still falls back to `Any`.
@@ -186,7 +187,7 @@ v1 is a checker that is quiet (globals), scriptable (JSON/SARIF), and drops into
 
 **Still deferred:**
 
-- Attribute completion after a `.`, which needs the declared type resolved rather than just named. The context's own names now complete and hover (see Status); the base expression is already parsed out and handed to the completion handler, so what remains is asking a type checker what members that expression has.
+- Attribute completion through a parenthesised or filtered base (`(items | first).`), which needs the fragment transpiled to Python before pyright sees it
 - Argument-level filter signatures and a catalog for third-party filters (only return types are pinned today)
 - Extension-tag declaration (rung 2)
 - Framework adapters (Flask, Django-Jinja2, FastAPI) that locate "this view renders this template with this context"

@@ -60,7 +60,13 @@ length  Function  length -> int (built-in filter)
 sort    Function  sort -> list[item] (built-in filter)
 ```
 
-Attribute completion after a `.` is not offered yet; the checker still reports a bad attribute as a diagnostic.
+After a `.`, the members of the expression's actual type are offered. That answer comes from `pyright-langserver`, which the LSP starts on the first attribute completion and reuses, so a loop variable offers its element's attributes:
+
+```
+{{ item.      ->  title  done
+```
+
+An expression whose type cannot be resolved offers nothing rather than guessing.
 
 ## The command path
 
@@ -74,7 +80,7 @@ Edits are debounced by 300 ms because each check runs pyright, which is much slo
 
 ## Verify
 
-`scripts/verify_lsp.sh` runs a headless Neovim over four phases: a bad template on disk, an unsaved edit to a clean template, a completion request inside a loop body, and a hover over a declared parameter. It exits non-zero unless every phase produces the expected result. Expected output:
+`scripts/verify_lsp.sh` runs a headless Neovim over five phases: a bad template on disk, an unsaved edit to a clean template, a completion request inside a loop body, a hover over a declared parameter, and an attribute completion resolved through pyright. It exits non-zero unless every phase produces the expected result. Expected output:
 
 ```
 phase1 (disk) diagnostics=3
@@ -87,5 +93,6 @@ phase3 (completion) items=5
   user -- user: User (parameter)
   ...
 phase4 (hover) user: User (parameter)
-phases ok: 1=true 2=true 3=true 4=true
+phase5 (members) title,done
+phases ok: 1=true 2=true 3=true 4=true 5=true
 ```

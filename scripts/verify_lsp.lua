@@ -3,6 +3,7 @@
 -- Phase 1 checks a bad template on disk. Phase 2 makes an unsaved edit to a
 -- clean template and confirms a diagnostic appears from the live buffer.
 -- Phase 3 asks for completions inside a loop body. Phase 4 hovers a parameter.
+-- Phase 5 completes an attribute, which is resolved through pyright-langserver.
 -- Exits 0 only when every phase produces the expected result.
 
 local root = vim.fn.getcwd()
@@ -88,13 +89,23 @@ local hovered = request(clean, 'textDocument/hover', position(clean, 5, 14))
 local hover_value = hovered and hovered.contents and hovered.contents.value or ''
 io.write(string.format('phase4 (hover) %s\n', hover_value:gsub('\n', ' ')))
 
+-- Phase 5: attribute completion inside the loop body, resolved through pyright.
+vim.api.nvim_buf_set_lines(clean, 10, 11, false, { '  <li>{{ item.' })
+vim.wait(500)
+local members = request(clean, 'textDocument/completion', position(clean, 11, 14)) or {}
+local member_items = members.items or members
+local member_labels = {}
+for _, item in ipairs(member_items) do member_labels[#member_labels + 1] = item.label end
+io.write(string.format('phase5 (members) %s\n', table.concat(member_labels, ',')))
+
 local phase1_ok = #disk_diags > 0
 local phase2_ok = live_appeared and #before == 0
 local phase3_ok = labels['item'] ~= nil and labels['loop'] ~= nil and labels['user'] == 'user: User (parameter)'
 local phase4_ok = hover_value:find('user: User', 1, true) ~= nil
-io.write(string.format('phases ok: 1=%s 2=%s 3=%s 4=%s\n',
-  tostring(phase1_ok), tostring(phase2_ok), tostring(phase3_ok), tostring(phase4_ok)))
-if phase1_ok and phase2_ok and phase3_ok and phase4_ok then
+local phase5_ok = #member_labels == 2 and member_labels[1] == 'title' and member_labels[2] == 'done'
+io.write(string.format('phases ok: 1=%s 2=%s 3=%s 4=%s 5=%s\n',
+  tostring(phase1_ok), tostring(phase2_ok), tostring(phase3_ok), tostring(phase4_ok), tostring(phase5_ok)))
+if phase1_ok and phase2_ok and phase3_ok and phase4_ok and phase5_ok then
   vim.cmd('qall!')
 else
   vim.cmd('cquit 1')

@@ -20,10 +20,11 @@ from pygls.lsp.server import LanguageServer
 from pygls.uris import to_fs_path
 
 from types_for_jinja import filters
-from types_for_jinja.check import Diagnostic, PyrightNotFoundError, check_file, check_source
-from types_for_jinja.complete import ContextName, context_names, cursor_context, describe, word_at
+from types_for_jinja.check import CACHE_DIR, Diagnostic, PyrightNotFoundError, check_file, check_source, prepare_cache
+from types_for_jinja.complete import ContextName, context_names, cursor_context, describe, probe_module, word_at
 from types_for_jinja.config import load_config
 from types_for_jinja.header import parse_header
+from types_for_jinja.members import MemberResolver
 
 SERVER = LanguageServer('types-for-jinja-lsp', '0.0.1')
 
@@ -90,11 +91,15 @@ def visible_names(source: str, line: int) -> list[ContextName]:
     return context_names(source, header, config, line=line)
 
 
-def complete(source: str, line: int, column: int) -> list[t.CompletionItem]:
+RESOLVER = MemberResolver(prepare_cache(CACHE_DIR))
+"""Shared connection to pyright for member lookup; started on first attribute completion."""
+
+
+def complete(source: str, line: int, column: int) -> list[t.CompletionItem]:  # ruff:ignore[too-many-return-statements]
     """Complete whatever the cursor is positioned on at zero-based ``line`` and ``column``.
 
-    Attribute access (anything after a ``.``) is left to the checker for now, so an empty
-    list there means "no suggestion", not "no such attribute".
+    An empty list means "no suggestion", never "no such name"; the checker is what reports
+    a name or attribute that does not exist.
     """
     lines = source.splitlines()
     if line >= len(lines):
@@ -103,6 +108,8 @@ def complete(source: str, line: int, column: int) -> list[t.CompletionItem]:
     match context.kind:
         case 'name':
             return _name_items(source, line)
+        case 'attribute':
+            return _member_items(source, line, context.attribute_of)
         case 'filter':
             return _catalog_items(filters.RETURNS, t.CompletionItemKind.Function, _filter_detail)
         case 'test':
@@ -121,6 +128,21 @@ def _name_items(source: str, line: int) -> list[t.CompletionItem]:
             detail=describe(entry),
         )
         for entry in visible_names(source, line + 1)
+    ]
+
+
+def _member_items(source: str, line: int, expression: str) -> list[t.CompletionItem]:
+    """Ask pyright what ``expression`` offers, inside the scopes the template puts it in."""
+    config = load_config(Path.cwd())
+    header = parse_header(source, config.syntax)
+    if header is None or not expression:
+        return []
+    probe = probe_module(source, header, config, line + 1, expression)
+    if probe is None:
+        return []
+    return [
+        t.CompletionItem(label=member.name, kind=t.CompletionItemKind(member.kind), detail=member.detail)
+        for member in RESOLVER.members(probe)
     ]
 
 
@@ -251,9 +273,18 @@ def hover(server: LanguageServer, params: t.HoverParams) -> t.Hover | None:
     return t.Hover(contents=t.MarkupContent(kind=t.MarkupKind.Markdown, value=f'```python\n{text}\n```'))
 
 
+@SERVER.feature(t.SHUTDOWN)
+def shutdown(_server: LanguageServer, _params: object) -> None:
+    """Stop the pyright connection member completion holds open."""
+    RESOLVER.shutdown()
+
+
 def main() -> None:
     """Start the language server over stdio."""
-    SERVER.start_io()
+    try:
+        SERVER.start_io()
+    finally:
+        RESOLVER.shutdown()
 
 
 if __name__ == '__main__':
