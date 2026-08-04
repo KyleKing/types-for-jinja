@@ -47,6 +47,12 @@ Static checking is the default and costs nothing at runtime. To also validate th
 
 `typed-jinja check --format json` and `--format sarif` emit machine-readable output. The SARIF report plugs into GitHub code scanning and coding agents.
 
+## Scope
+
+typed-jinja checks Jinja2, and Jinja supersets and dialects that Jinja's own parser reads: plain Jinja2, JinjaX, and the templates in Flask, Litestar, FastAPI, Copier, and Cookiecutter projects. Supersets work today as long as they keep Jinja's standard delimiters.
+
+Ansible, Salt, and dbt are out of scope, because their contexts are untyped runtime dicts and their custom filter libraries would all report as `Any` (dbt already has TypeJinja). So are engines not hosted in Python (Nunjucks, Twig, Liquid, Handlebars) and Python engines with different lookup semantics (Django's DTL, Mako, Chameleon). See [PLAN] for the reasoning.
+
 ## Project Status
 
 Early and moving. See [PLAN] for the architecture, roadmap, and design decisions, plus the `Open Issues` and the [CODE_TAG_SUMMARY]. For release history, see the [CHANGELOG].

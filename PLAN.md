@@ -1,14 +1,28 @@
 # typed-jinja — implementation plan
 
-A static type checker for Jinja2 templates. It validates the variables, attribute access, and control flow inside a template against a typed context you declare, with no new template language and no runtime cost by default.
+A static type checker for Jinja2 templates, and for Jinja supersets and dialects. It validates the variables, attribute access, and control flow inside a template against a typed context you declare, with no new template language and no runtime cost by default. See "Scope boundary" for what that phrase does and does not include.
 
 ## Origin
 
 Distilled from research (see the "Python templating libraries with type support" chat). Python has no equivalent of Go's templ, Scala's Twirl, or Rust's askama: a template whose context is checked against real host-language types before it runs. Prior art that shaped the design:
 
-- **dbt TypeJinja** (2025), a static checker over dbt's Jinja IR that found 30 real, previously-unknown type errors. It proves the demand and the technique.
+- **dbt TypeJinja** (2025), a static checker over dbt's Jinja IR that found 30 real, previously-unknown type errors. It proves the demand and the technique. It is also why dbt itself sits outside our scope, since that ecosystem is already served.
 - **Twirl / templ / askama**, which compile a template into a typed host-language function wired into the build. Durable for 10+ years. We borrow the ergonomics of this model (a typed callable) without becoming a renderer. See "Architecture".
 - **Coffin / Jingo** (dead Django-Jinja shims), the anti-pattern. A dual-engine compatibility layer dies once the host framework absorbs the capability. We do not build a shim.
+
+## Scope boundary
+
+The technique generalizes further than this implementation will. Transpiling a template to a throwaway host-language stub and running the host's type checker over it is engine-agnostic. We are choosing not to chase that, and this section records why so the question stays settled.
+
+In scope is Jinja2 together with Jinja supersets and dialects, meaning anything Jinja's own parser reads: plain Jinja2, JinjaX, and the template sets in Flask, Litestar, FastAPI, Copier, and Cookiecutter projects. A superset that adds tags through a Jinja Extension belongs here. Today such a superset works only when it keeps Jinja's standard delimiters, because `transpile()` builds a default `Environment(autoescape=True)` and `resolve.py` assumes a filesystem loader. Threading delimiters and a loader through `Config` is roadmap work, not a redesign.
+
+Ansible, Salt, and dbt are out even though they parse as Jinja. Their contexts are untyped dicts assembled at runtime, so there is no declared type for a checker to check against, and all three lean on large custom filter libraries that `_filtered` collapses to `Any`. dbt already has TypeJinja, which works over dbt's own IR and understands `ref()` and `source()` in a way a generic Jinja checker cannot. Serving these would mean adopting three per-ecosystem filter catalogs plus a context-discovery story per host, and none of that work carries over to the templates we do serve.
+
+Engines not hosted in Python are out for a harder reason. Everything downstream of the AST assumes Python: the stub is Python, pyright checks it, and the declared types are Python types. Nunjucks, Twig, Liquid, Handlebars, and Blade would each need their own emitter and their own type checker (`tsc`, PHPStan, Sorbet). That replaces the backend, which makes it a separate product rather than an adapter. templ and askama already solve this natively in Go and Rust.
+
+Other Python engines are out for a semantic reason. Django's DTL resolves `{{ a.b }}` as dict key, then attribute, then list index, and calls zero-arg callables implicitly, so most dotted access would widen to `Any` and the checker would stop saying anything useful. Its `{% load %}` tags carry signatures that live nowhere in the template. Mako embeds real Python already, which makes it an extraction problem of a different shape. Liquid is forgiving by design, where a missing variable rendering empty is correct behavior, so strict diagnostics read as false positives against the language's own contract.
+
+If this ever reverses, the cost is known. `_emit_node` and `_expr` in `typed_jinja/transpile.py` pattern-match `jinja2.nodes` directly, and `header.py` hardcodes the `{# #}` comment form. A second Python-hosted engine would need an engine-neutral IR between the parser and the emitter, covering the dozen node kinds `_emit_node` already switches on. That is a few hundred lines. Do it when a second engine has a user asking for it.
 
 ## Design axes
 
@@ -169,6 +183,7 @@ v1 is a checker that is quiet (globals), scriptable (JSON/SARIF), and drops into
 
 **Still deferred:**
 
+- Expanding the LSP past the typed context: general Jinja language features (tag/filter completions, hover docs) and, at minimum, completions for the typed context's own keys and attributes. [typed-htmx](https://github.com/Desdaemon/typed-htmx) is the reference point, it types htmx attributes for JSX completions the same way.
 - Productizing the typed wrapper codegen (Level 1) and runtime enforcement (Level 2) into the CLI and a documented workflow. The mechanism is proven in `examples/runtime`; what remains is wiring, not feasibility.
 - Typed macro params, so a bad attribute on a param inside a macro body is caught
 - `{% include %}` cross-template context, multi-level `{% extends %}` chains
@@ -177,13 +192,15 @@ v1 is a checker that is quiet (globals), scriptable (JSON/SARIF), and drops into
 - Framework adapters (Flask, Django-Jinja2, FastAPI) that locate "this view renders this template with this context"
 - Sidecar/registry binding as an alternative to the header
 - Custom extensions, i18n
-- Non-HTML targets (dbt-style SQL), which are a different program
+- Configurable Jinja delimiters and non-filesystem loaders, which are what a Jinja superset needs before it is fully supported
+
+Ruled out entirely, per "Scope boundary": Ansible, Salt, and dbt; engines not hosted in Python; and Python engines with different lookup semantics (DTL, Mako, Chameleon).
 
 ## Validation targets
 
 1. A tiny standalone example in `examples/` (fastest proof the mechanism works).
 1. The user's **yak-shears** project, the real migration test.
-1. A demo Django/Flask app as a later, optional showcase. Django's own DTL is not Jinja, so a Flask or standalone-Jinja demo is the cleaner first target.
+1. A demo Flask app as a later, optional showcase. Django only qualifies when it renders Jinja through `django-jinja`, because DTL is out of scope.
 
 ## Validation findings (spike, run against yak-shears)
 

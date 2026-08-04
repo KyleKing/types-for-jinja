@@ -74,6 +74,16 @@ Now `render_profile(porfile=...)` is a static error at the call site, and a wron
 
 `typed-jinja check --format json` and `--format sarif` emit machine-readable output. The SARIF report plugs into GitHub code scanning and coding agents, so template type errors show up next to your other findings.
 
+## Scope
+
+typed-jinja checks Jinja2, and Jinja supersets and dialects, meaning template sets that Jinja's own parser reads. That covers plain Jinja2, JinjaX, and the templates in Flask, Litestar, FastAPI, Copier, and Cookiecutter projects. A superset that adds tags through a Jinja Extension works today as long as it keeps Jinja's standard delimiters, because the checker parses with a default `Environment`. Configurable delimiters are on the roadmap.
+
+Three things are out of scope on purpose:
+
+- Ansible, Salt, and dbt. They parse as Jinja, but their contexts are untyped dicts assembled at runtime, so there is no declared type to check against, and their large custom filter libraries would report as `Any` under a checker that has no filter signatures. dbt already has TypeJinja
+- Engines not hosted in Python: Nunjucks, Twig, Liquid, Handlebars, and Blade. The design emits a Python stub and runs a Python type checker over it, so a different host language means a different tool rather than an adapter
+- Other Python engines with different resolution semantics: Django's DTL, Mako, and Chameleon. DTL's dotted lookup falls back through dict key, then attribute, then list index, which would push most expressions to `Any` and leave the checker with nothing to say
+
 ## Status
 
 Early and moving. The checker, the CLI with JSON and SARIF output, the globals declaration, and the runtime-wrapper proof are in place. The LSP (in-editor diagnostics) and v1 hardening are in progress. See [PLAN.md](PLAN.md) for the architecture, the roadmap, and the design decisions behind all of this.

@@ -1,29 +1,30 @@
-See discussion about beartype/pydantic screenshot
-Finish initial implementation, publish to GitHub, to PyPi, use in Yak-Shears?
+Open items, priority order.
 
-## 2026-07-27 - published to GitHub, CI is red on two counts
+1. Publish a real version to PyPI. Version is pinned at 0.0.1 and the Publish
+   to PyPI workflow is green but tag-gated, so nothing has shipped. This is
+   what unblocks yak-shears, which had to drop its editable path source at
+   ../../local-code/typed-jinja to build.
 
-Pushed 20 commits to github.com/KyleKing/typed-jinja (was an empty public repo).
-Nothing reached PyPI: the publish workflow's `build` job ran, and
-`publish-testpypi`, `publish-pypi`, and `create-release` are tag-gated and all
-skipped. Locally the suite is healthy, 51 passed, once `uv sync --all-extras` is
-run. Without the extras, test_lsp and test_wrapper fail collection on missing
-pydantic and pygls.
+2. Pyright-backed tests never run in CI. Seven tests in tests/test_checker.py
+   and tests/test_lsp.py are gated behind skipif(shutil.which('pyright') is
+   None), and the CI test job never installs pyright, so the whole
+   pyright-backed suite is silently skipped. Locally those 7 fail: drift
+   between examples/templates/greeting_bad.html and the assertions (expected 3
+   diagnostics, got 4; expected `def _render(user: User) -> None:`). Decide
+   whether to update the assertions or the fixtures, then install pyright in
+   the CI test job so the suite actually runs.
 
-Two things to settle before publishing to PyPI:
+3. Point .copier-answers.yml at the published template. _src_path is still
+   the local path /Users/kyleking/Developer/kyleking/calcipy_template, which a
+   Fleet run on another machine can't resolve. _commit is already 5.0.3, so
+   switching _src_path to gh:KyleKing/calcipy_template is unblocked.
 
-- DONE, committed locally and NOT pushed: the CI test matrix asks for Python
-  "3.11", which resolves to 3.11.9, while `requires-python` was `>=3.11.11`. uv
-  refused the interpreter and the job died in setup. Lowered the floor to
-  `>=3.11.9` in pyproject.toml, with the matching one-line `uv lock` update. macOS
-  failed and Windows was cancelled by fail-fast, so neither platform has run the
-  suite on a runner yet. Pushing this is what proves it
-- mypy reports 13 errors across 6 files, all in `tests/`. Some look deliberate
-  (test_wrapper passes a `str` and a `dict` where a `Profile` is expected, which is
-  presumably the point of a runtime-validation test) and want a targeted
-  `# type: ignore` with a reason. The rest look real: `transpile` is called with
-  `TemplateHeader | None` in four tests where it expects `TemplateHeader`,
-  test_lsp assigns over a method twice, and test_v1_robustness reaches for
-  `typed_jinja.check.shutil`, which is not exported
-
-The lint job passes.
+4. Open design question: yak-shears hand-writes 7 render_* functions that
+   restate the parameter list their template's {#def ... #} header already
+   declares, the same signature generate_wrapper would emit. The blocker is
+   that generate_wrapper returns Markup while yak-shears' helpers return
+   starlette.responses.HTMLResponse (and render_error also sets an
+   HTTPStatus), and some helpers do real work before rendering. Decide
+   whether typed-jinja grows a "wrap the render in a caller-supplied
+   callable" option, or yak-shears keeps its helpers and only generates the
+   inner typed render.
