@@ -1,8 +1,19 @@
 # Checker backends and batching
 
-Parked design notes from 2026-07-29. The backend and batching work below is unimplemented; `types_for_jinja/layout.py` and `types_for_jinja/generate.py` are the part that shipped. This exists so the measurements do not have to be redone.
+Design notes from 2026-07-29, revised 2026-08-04 once `generate` was made to check clean under all three backends. Backend discovery for `check` and the batching work below are still unimplemented. This exists so the measurements do not have to be redone.
 
 Measured with pyright 1.1.411 (mise pipx), ty 0.0.61, and mypy 2.3.0 on macOS.
+
+## Decision: `generate` is the portable path, `check` stays on pyright
+
+`types-for-jinja generate` writes stubs that pyright, ty, and mypy all read the same way, verified by `tests/test_backends.py` on every run where the backend is installed. `check` keeps its own pyright subprocess and its `TJ###` codes, because it owns the diagnostics it prints.
+
+Two defects had to be fixed before that was true, and both were invisible under pyright alone:
+
+- the stub reused one `_` name for every expression check, so mypy took its declared type from the first assignment and reported `Incompatible types in assignment` on every later one. The preamble now declares `_: _TJAny`
+- the generated filter signatures had `...` bodies in a real module, which ty reports as `empty-body`. They now raise
+
+Over the example templates that took ty from 58 diagnostics to the 3 that `greeting_bad.html.jinja` is supposed to have, and mypy from 12 to the same 3.
 
 ## Why types-for-jinja runs the checker itself
 
@@ -32,11 +43,13 @@ One real point survives regardless: `_write_pyright_config` writes a fresh `pyri
 
 Measured over 126 templates, 11 from `examples/` and 115 real ones from mkdocs-material.
 
-|                                           | count | share |
-| ----------------------------------------- | ----- | ----- |
-| exact line-aligned stub                   | 120   | 95.2% |
-| no aligned form, keeps `# L` markers      | 3     | 2.4%  |
-| `_UnsupportedError` escapes `transpile()` | 3     | 2.4%  |
+|                                                | count | share |
+| ---------------------------------------------- | ----- | ----- |
+| exact line-aligned stub                        | 120   | 95.2% |
+| no aligned form, keeps `# L` markers           | 3     | 2.4%  |
+| `UnsupportedTemplateError` escapes `transpile` | 3     | 2.4%  |
+
+Both remainders have since been addressed. The 3 unaligned templates were all `{% if %}...{% else %}...{% endif %}` on one physical line, which now collapses to `_ = (a if cond else b)`, because a conditional expression narrows the same way the branches did and fits where two compound statements could not. `UnsupportedTemplateError` is public and caught by both `generate` and `check`, so one template using a construct the transpiler does not model is skipped with a reason (`TJ012`) rather than ending the run. `{% set ns.count = 1 %}` is the common case, since `namespace` is a real Jinja idiom the transpiler has no model for.
 
 Against the example templates carrying a real `{#def #}` header, the aligned stubs checked by raw pyright produce diagnostics identical to `check_file`. `tests/test_layout.py` asserts that parity, along with every generated file parsing as Python and the sidecar binding the declared context.
 
@@ -59,8 +72,7 @@ The preamble collapses onto the header's own line as `;`-joined simple statement
 
 What it does not do:
 
-- columns, only lines. Pyright reports column 10 where the template has `{{ user.naem }}` at column 18
-- `{% else %}` sharing a physical line with its branch has no aligned form, which is all 3 fallbacks
+- the file path and the column. Your checker prints `_jinja_stubs/templates/profile_html.py:5:10`, where the template has `{{ user.naem }}` at `templates/profile.jinja:5:18`. The line is right and the stub path mirrors the template tree, so the mapping is readable, but nothing makes the checker name the template. Go's `//line` directives are why templ can and Python has no equivalent for type checkers. The editor path does not have this problem: the LSP reports template positions with columns
 - `loop` is bound at module level, so using `loop` outside a `{% for %}` is not flagged
 
 The output directory must not start with a dot. Pyright excludes `**/.*` by default and reports a clean run over zero files, which is why the default is `_jinja_stubs` and not `.types_for_jinja`. Stub paths mirror the template tree with only the filename mangled, because a module name cannot carry the template's extension.
@@ -68,6 +80,8 @@ The output directory must not start with a dot. Pyright excludes `**/.*` by defa
 ## All three backends agree
 
 Checked against a real generated stub (dataclass context, bad attribute, undefined name, loop variable, filter call, bad method on `int`). pyright, ty, and mypy each reported the same four errors on the same template lines. The abstraction is sound.
+
+`tests/test_backends.py` holds that: it runs whichever backends are installed over the same generated tree and asserts each agrees with `check_file`, and that ty and mypy agree with each other. CI sets `TYPES_FOR_JINJA_REQUIRE_CHECKERS` so a missing backend fails rather than skips.
 
 ## What varies between backends
 
@@ -104,7 +118,22 @@ Related: `RULE_CODES` maps TJ003 to `reportIndexIssue`, and pyright never emitte
 
 Preferred fix is narrowing the catalog to categories every backend agrees on (undefined name, bad attribute, bad call, everything else) rather than keeping codes only one backend can produce.
 
-`generate` sidesteps the code question and inherits the suppression one. Users see their own checker's native codes, so there is nothing to map. But `{# type: ignore[TJ003] #}` has to become a real `# type: ignore[...]` on the aligned line, and the code inside those brackets is backend-specific. Unsolved.
+`generate` sidesteps the code question. Users see their own checker's native codes, so there is nothing to map.
+
+Suppression is solved, by dropping the codes rather than translating them. Measured behaviour of a bare ignore comment:
+
+|                          | pyright    | ty         | mypy       |
+| ------------------------ | ---------- | ---------- | ---------- |
+| `# type: ignore`         | suppresses | suppresses | suppresses |
+| `# ty: ignore`           | no         | suppresses | no         |
+| `# pyright: ignore`      | suppresses | no         | no         |
+| `# type: ignore[<code>]` | suppresses | no         | suppresses |
+
+So `{# type: ignore #}` and `{# type: ignore[TJ002] #}` both emit one blanket ignore on the aligned line, spelled per `[tool.types_for_jinja] suppression`: `portable` (the default, `# type: ignore`), or `mypy`, `pyright`, `ty`. An unknown value is rejected at config load, because a silent fallback would emit comments the project's checker does not honour.
+
+Two things ruled out the obvious alternatives. Stacking `# type: ignore  # ty: ignore` works, but ty then reports `unused-ignore-comment` on the second one, because the first already suppressed it. And per-code brackets need a TJ-to-native table that is one-to-many (TJ004 is ty's `invalid-argument-type` or `too-many-positional-arguments` depending on the call), where a wrong guess both fails to suppress and adds an `ignore-comment-unknown-rule` warning.
+
+On the unaligned fallback the ignore goes in front of the `# L<n>` marker, since `_template_line` reads the marker off the end of the line and a checker only honours the directive when it opens the comment.
 
 ## Batching is the large performance win
 
@@ -142,9 +171,9 @@ Seven test files gate on `shutil.which('pyright')`, several assert on literal py
 - Make `ty` a hard dependency? It is a zero-dependency wheel on PyPI, so it guarantees every install has a working backend and removes the `PyrightNotFoundError` path entirely. Against it: ty is pre-1.0, and its diagnostics still move between releases
 - If discovery stays, default order ty then pyright then mypy, with `[tool.types_for_jinja] checker` to pin. The resolved backend should appear in the summary line so a CI failure that does not reproduce locally is diagnosable
 - Whether to read the project's existing checker config instead of writing our own
-- Whether `generate` becomes the default and `check` becomes the fallback for the aligned minority, which would drop the runtime dependency set to jinja2 alone
 - Staleness for `generate`. `--check` gates it, but committing the stubs is what makes a fresh clone typecheck correctly before anyone runs types-for-jinja
-- Three templates crash `transpile()` with `_UnsupportedError` escaping to the caller (`_emit_for` calls `_target` uncaught, among others), which takes down a whole run rather than skipping one template
+- A `types-for-jinja remap` filter (`ty check --output-format concise | types-for-jinja remap`) to rewrite stub paths and columns back to templates in CI output. It is the only way to recover what `//line` gives Go, and it parses each backend's stdout, which is the work backend discovery would need anyway
+- `namespace` has no model in the transpiler, so `{% set ns.count = 1 %}` skips the whole template. Binding `ns` from `namespace(...)` would need the call itself typed, or every such template reports `namespace` undefined, which is worse than skipping
 - `pyright[nodejs]` on PyPI bundles node through `nodejs-wheel-binaries`, and `basedpyright` requires it unconditionally. Either removes the "pyright must be on PATH" problem without changing the inference engine, if staying on pyright turns out to matter
 
 ## Reproducing the benchmark

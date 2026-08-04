@@ -9,12 +9,12 @@ from corallium.file_helpers import delete_dir, ensure_dir
 
 
 def requires_checker(name: str) -> pytest.MarkDecorator:
-    """Skip when ``name`` is absent, unless ``TYPES_FOR_JINJA_REQUIRE_PYRIGHT`` demands it be present.
+    """Skip when ``name`` is absent, unless ``TYPES_FOR_JINJA_REQUIRE_CHECKERS`` demands it be present.
 
     CI sets that variable so a missing checker fails the suite rather than silently skipping it.
     """
     return pytest.mark.skipif(
-        shutil.which(name) is None and not os.environ.get('TYPES_FOR_JINJA_REQUIRE_PYRIGHT'),
+        shutil.which(name) is None and not os.environ.get('TYPES_FOR_JINJA_REQUIRE_CHECKERS'),
         reason=f'{name} is required',
     )
 

@@ -56,13 +56,35 @@ Jinja's built-in filters carry their return type, so a filtered expression is st
 uv add types-for-jinja      # or: pip install types-for-jinja
 ```
 
-`types-for-jinja` calls [pyright](https://github.com/microsoft/pyright) for the type inference, so pyright needs to be on your PATH.
+`types-for-jinja check` calls [pyright](https://github.com/microsoft/pyright) for the type inference, so pyright needs to be on your PATH. `types-for-jinja generate` needs no checker of its own and works with pyright, ty, or mypy; see "Use your own type checker" below.
 
 ## How it works
 
 `types-for-jinja` parses the template with Jinja's own parser, transpiles it into a small Python stub that exercises every expression, and runs pyright over that stub. Errors map back to the template's own line and column. The stub is thrown away and Jinja renders the real template unchanged, so there is nothing to migrate beyond the one-line header. Declare Environment globals (such as `static_url`) once under `[tool.types_for_jinja]` in `pyproject.toml` so the checker treats them as defined.
 
 `types-for-jinja check --format json` and `--format sarif` emit machine-readable output for CI. The SARIF report plugs into GitHub code scanning and coding agents. A pre-commit hook and an LSP (with a Neovim integration in `editors/nvim`) deliver the same diagnostics to commits and editors. The LSP also completes and describes the typed context: its names, the members of their types, Jinja's built-in filters and tests, and its tags.
+
+## Use your own type checker
+
+`types-for-jinja generate` writes the stubs to disk instead of checking them, so your existing pyright, ty, or mypy run covers your templates and nothing shells out to a second checker:
+
+```console
+types-for-jinja generate templates/ -o _jinja_stubs
+ty check          # or: mypy .  /  pyright
+```
+
+Generated line N is template line N, so every checker reports the right line. All three are verified against each other on every CI run. Commit the stubs and a fresh clone type-checks correctly without types-for-jinja installed at all. Run `types-for-jinja generate --check` in a pre-commit hook to fail when one is out of date.
+
+The one thing a stub cannot carry is the template's own path and column. Your checker names `_jinja_stubs/templates/profile_html.py:5`, where the template has `templates/profile.jinja:5:18`. The line is right and the stub tree mirrors the template tree. For template-native positions with columns, use the LSP in your editor or `types-for-jinja check` in CI.
+
+An inline `{# type: ignore #}` becomes a blanket ignore comment on the generated line. Checkers spell that differently, so name yours if you run only one:
+
+```toml
+[tool.types_for_jinja]
+suppression = "ty" # portable (default), mypy, pyright, or ty
+```
+
+The default emits `# type: ignore`, which all three honour. Naming a checker emits only what that checker reads, so `pyright` writes `# pyright: ignore` and mypy will not honour it.
 
 ## Typed render calls (optional)
 
