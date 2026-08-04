@@ -14,6 +14,7 @@ from pathlib import Path
 
 from jinja2 import Environment, TemplateSyntaxError, nodes
 
+from types_for_jinja import filters
 from types_for_jinja.config import Config
 from types_for_jinja.header import TemplateHeader, parse_defs
 from types_for_jinja.resolve import resolve_template
@@ -129,7 +130,7 @@ def transpile(
     )
     split = _split_top_level(tree, ctx)
 
-    lines = _preamble(header, config, [*macro_imports, *split.imports])
+    lines = _preamble(header, config, [*macro_imports, *split.imports, *filter_imports(tree)])
     preamble_len = len(lines)
     lines.extend(split.foreign_defs)
     lines.extend(split.module_defs)
@@ -614,12 +615,31 @@ def _call(node: nodes.Call) -> str:
 
 
 def _filtered(node: nodes.Filter | nodes.Test) -> str:
+    """Apply a filter or test as a call, using its declared signature when there is one."""
     if node.node is None:
         raise _UnsupportedError(type(node).__name__)
     args = [_expr(node.node)]
     args.extend(_expr(arg) for arg in node.args)
     args.extend(f'{kw.key}={_expr(kw.value)}' for kw in node.kwargs)
-    return '_tj_any(' + ', '.join(args) + ')'
+    return f'{_filter_callable(node)}(' + ', '.join(args) + ')'
+
+
+def _filter_callable(node: nodes.Filter | nodes.Test) -> str:
+    if isinstance(node, nodes.Test):
+        return filters.TEST_STUB
+    return filters.stub_name(node.name) if node.name in filters.RETURNS else '_tj_any'
+
+
+def filter_imports(tree: nodes.Template) -> list[str]:
+    """The names a stub for ``tree`` must import from the generated filter module."""
+    used = {
+        filters.stub_name(node.name)
+        for node in tree.find_all(nodes.Filter)
+        if node.node is not None and node.name in filters.RETURNS
+    }
+    if any(node.node is not None for node in tree.find_all(nodes.Test)):
+        used.add(filters.TEST_STUB)
+    return [f'from {filters.MODULE_NAME} import {", ".join(sorted(used))}'] if used else []
 
 
 def _slice(node: nodes.Slice) -> str:

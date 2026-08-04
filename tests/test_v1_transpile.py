@@ -35,8 +35,25 @@ def test_include_does_not_crash():
     assert '_render' in _code('{#def x: int #}\n{% include "other.html" %}{{ x }}')
 
 
-def test_filter_result_is_any():
-    assert '_tj_any(items)' in _code('{#def items: list[int] #}\n{{ items | length }}')
+def test_known_filter_uses_its_declared_signature():
+    code = _code('{#def items: list[int] #}\n{{ items | length }}')
+
+    assert 'from _tj_filters import _tj_f_length' in code
+    assert '_tj_f_length(items)' in code
+
+
+def test_unknown_filter_still_falls_back_to_any():
+    code = _code('{#def items: list[int] #}\n{{ items | my_custom_filter }}')
+
+    assert '_tj_any(items)' in code
+    assert '_tj_filters' not in code
+
+
+def test_test_expression_uses_the_boolean_signature():
+    code = _code('{#def x: int #}\n{% if x is divisibleby 3 %}y{% endif %}')
+
+    assert 'from _tj_filters import _tj_test' in code
+    assert '_tj_test(x, 3)' in code
 
 
 def test_slice_is_emitted():

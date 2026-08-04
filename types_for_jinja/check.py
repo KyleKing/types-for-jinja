@@ -11,6 +11,7 @@ from typing import Any
 
 from jinja2 import TemplateSyntaxError
 
+from types_for_jinja import filters
 from types_for_jinja.codes import apply_codes
 from types_for_jinja.config import Config, load_config
 from types_for_jinja.diagnostic import Diagnostic
@@ -59,6 +60,7 @@ def _raw_diagnostics(source: str, path: Path, cache_dir: Path, config: Config | 
     cache_dir.mkdir(parents=True, exist_ok=True)
     _write_cache_gitignore(cache_dir)
     _write_pyright_config(cache_dir)
+    (cache_dir / f'{filters.MODULE_NAME}.py').write_text(filters.module_source(), encoding='utf-8')
     generated = cache_dir / f'{_safe_name(path)}.py'
     generated.write_text(module.code, encoding='utf-8')
     generated_lines = module.code.splitlines()

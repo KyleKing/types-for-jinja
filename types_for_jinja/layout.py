@@ -14,20 +14,18 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING
 
-from types_for_jinja.transpile import Line
-
-if TYPE_CHECKING:
-    from types_for_jinja.header import TemplateHeader
-    from types_for_jinja.transpile import GeneratedModule
+from types_for_jinja.header import TemplateHeader
+from types_for_jinja.transpile import GeneratedModule, Line
 
 _LOOP_BINDING = 'loop = _tj_loop'
 _SCAFFOLD = (
     'from typing import Any as _TJAny, cast as _tj_cast',
     '_tj_any = _tj_cast(_TJAny, 0)',
     'loop = _tj_any',
+    '_tj_default = _tj_any',
 )
+_SCAFFOLD_PREFIXES = ('def _tj_any', '_tj_loop', '_tj_default')
 _RENDER_DEF = 'def _render('
 
 
@@ -66,13 +64,22 @@ def _layout(module: GeneratedModule, header: TemplateHeader, sidecar_name: str) 
         *buckets.get(header.lineno, []),
     ]
     code = '\n'.join(_physical_line(buckets.get(lineno, [])) for lineno in range(1, max(buckets) + 1)) + '\n'
-    return AlignedModule(code=code, sidecar=_sidecar(preamble, foreign))
+    return AlignedModule(code=code, sidecar=_sidecar(preamble, foreign, header))
 
 
-def _sidecar(preamble: list[Line], foreign: list[Line]) -> str:
+def _sidecar(preamble: list[Line], foreign: list[Line], header: TemplateHeader) -> str:
+    """Emit the definitions another template contributed, over a fully bound preamble.
+
+    The sidecar needs the same bound names the aligned stub has. A bare annotation would
+    leave every global unbound and every header parameter undefined, so the real errors
+    from the other template would be buried.
+    """
     if not foreign:
         return ''
-    body = [*preamble, *(replace(line, indent=max(line.indent - 1, 0)) for line in foreign)]
+    body = [
+        *_flatten_preamble(preamble, header),
+        *(replace(line, indent=max(line.indent - 1, 0)) for line in foreign),
+    ]
     return '\n'.join('    ' * line.indent + line.text for line in body) + '\n'
 
 
@@ -115,7 +122,12 @@ def _is_import(text: str) -> bool:
 
 
 def _is_scaffold(text: str) -> bool:
-    return text.startswith(('def _tj_any', '_tj_loop'))
+    """Preamble lines the aligned form replaces with its own bound equivalents in ``_SCAFFOLD``.
+
+    Binding one of these again would produce a second assignment on an already-assigned
+    statement, which is not valid Python.
+    """
+    return text.startswith(_SCAFFOLD_PREFIXES)
 
 
 def _bind(text: str) -> str:

@@ -48,6 +48,8 @@ A macro takes its own `{#def #}` block, which types its parameters for both its 
 
 Without that block the parameters stay untyped and only arity is checked.
 
+Jinja's built-in filters carry their return type, so a filtered expression is still checked: `{{ items | length }}` is an `int`, and `{% for x in items | sort %}` still knows what `x` is. Only the return type is pinned, because a filter catalog that guesses at argument types reports errors on correct templates. A filter the catalog does not know (yours, or one from an extension) falls back to `Any`, exactly as before.
+
 ## Installation
 
 ```console

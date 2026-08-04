@@ -12,6 +12,7 @@ from pathlib import Path
 
 from jinja2 import TemplateSyntaxError
 
+from types_for_jinja import filters
 from types_for_jinja.config import Config, load_config
 from types_for_jinja.emit import flat_name, mirrored_path, package_markers, stale_files, write_files
 from types_for_jinja.header import parse_header
@@ -39,7 +40,7 @@ class Generated:
 
     @property
     def files(self) -> dict[Path, str]:
-        """Every file the run would write, stub and package marker alike."""
+        """Every file the run would write: stubs, package markers, and the filter signatures."""
         return {path: text for stub in self.stubs for path, text in stub.files.items()}
 
     @property
@@ -59,7 +60,15 @@ def generate(templates: list[Path], out_dir: Path, config: Config | None = None)
             skipped.append((template, outcome))
         else:
             stubs.append(outcome)
+    if stubs:
+        stubs.append(_filter_stub(out_dir))
     return Generated(stubs=stubs, skipped=skipped)
+
+
+def _filter_stub(out_dir: Path) -> Stub:
+    """The filter signatures every generated stub imports from."""
+    path = out_dir / f'{filters.MODULE_NAME}.py'
+    return Stub(template=path, files={path: filters.module_source()}, aligned=True)
 
 
 def write(generated: Generated) -> list[Path]:

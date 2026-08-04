@@ -38,7 +38,7 @@ Measured over 126 templates, 11 from `examples/` and 115 real ones from mkdocs-m
 | no aligned form, keeps `# L` markers      | 3     | 2.4%  |
 | `_UnsupportedError` escapes `transpile()` | 3     | 2.4%  |
 
-Against the 9 example templates carrying a real `{#def #}` header, the aligned stubs checked by raw pyright produce diagnostics identical to `check_file`, 9 of 9.
+Against the example templates carrying a real `{#def #}` header, the aligned stubs checked by raw pyright produce diagnostics identical to `check_file`. `tests/test_layout.py` asserts that parity, along with every generated file parsing as Python and the sidecar binding the declared context.
 
 Both checkers find the same three errors on the same lines in a generated stub, with no types-for-jinja process running:
 
