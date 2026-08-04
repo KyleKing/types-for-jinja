@@ -187,7 +187,6 @@ def _filter_module(out_dir: Path) -> Path:
 
 
 def _prune_empty_dirs(candidates: set[Path], out_dir: Path) -> None:
-    """Remove mirrored directories left empty once their last stub was deleted."""
     for directory in sorted(candidates, key=lambda path: len(path.parts), reverse=True):
         current = directory
         while current != out_dir and out_dir in current.parents and current.is_dir() and not any(current.iterdir()):

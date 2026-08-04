@@ -30,18 +30,35 @@ Generate the stubs, then run whichever checker the project already uses:
 
 ```console
 $ types-for-jinja generate templates/
+types-for-jinja: Wrote 5 file(s) for 1 template(s)
 $ ty check
 _jinja_stubs/templates/greeting_html.py:5:5: error[unresolved-attribute] Object of type `User` has no attribute `naem`
-_jinja_stubs/templates/greeting_html.py:7:5: error[unresolved-attribute] Object of type `Item` has no attribute `titel`
+_jinja_stubs/templates/greeting_html.py:7:9: error[unresolved-attribute] Object of type `Item` has no attribute `titel`
+Found 2 diagnostics
 ```
 
 Generated line N is template line N, so the line numbers are the template's own. Pipe through `remap` when you want the template's path and column too:
 
 ```console
 $ ty check | types-for-jinja remap
-templates/greeting.html:5:16: error[unresolved-attribute] Object of type `User` has no attribute `naem`
-templates/greeting.html:7:11: error[unresolved-attribute] Object of type `Item` has no attribute `titel`
+templates/greeting.html:5:14: error[unresolved-attribute] Object of type `User` has no attribute `naem`
+templates/greeting.html:7:10: error[unresolved-attribute] Object of type `Item` has no attribute `titel`
+Found 2 diagnostics
 ```
+
+A pipeline hands back the filter's exit code rather than the checker's, so in CI let `remap` run the checker instead. It exits with the checker's status, and with ty's default format the source excerpt becomes the template's own line:
+
+```console
+$ types-for-jinja remap -- ty check
+error[unresolved-attribute]: Object of type `User` has no attribute `naem`
+ --> templates/greeting.html:5:14
+  |
+5 | <h1>Hello {{ user.naem }}</h1>
+  |              ^^^^^^^^^
+  |
+```
+
+`remap` reads text output from ty, mypy, and pyright, plus `pyright --outputjson`, `mypy --output json`, and ty's `gitlab` and `github` formats. A path outside the stub tree passes through untouched, so piping a whole-project run leaves the project's own diagnostics exactly as the checker wrote them.
 
 The `{#def #}` block is a plain Jinja comment, so the template renders exactly as before. The loop variable is narrowed to its element type, so `item.titel` is caught the same way `user.naem` is.
 
@@ -82,9 +99,34 @@ Cross-file constructs resolve at generation time: a child checks against its who
 The stubs are ordinary workspace Python, so the Python language server you already run flags them with no setup: open the stub and the error is on the same line number as the template. Two layers make that invisible:
 
 - The `types-for-jinja-lsp` server (the `lsp` extra) attaches to template buffers and regenerates the stub as you type, debounced, so your Python checker re-checks it live before you save. It also completes and describes the typed context in the template itself: the names visible at the cursor, the members of their types after a `.`, built-in filters after `|` (with return types), tests after `is`, and tags after `{%`, plus hover for all of them.
-- A thin mirror republishes the stub's diagnostics onto the template buffer, line for line, so errors appear inline in the template with your checker's own codes. `editors/nvim` ships the autocmd for Neovim; a VS Code extension covers the same for VS Code.
+- A thin mirror republishes the stub's diagnostics onto the template buffer, line for line, so errors appear inline in the template with your checker's own codes. Mirroring has to live in the editor, because one language server cannot read another server's diagnostics. `editors/nvim` ships it for Neovim. VS Code, Cursor, Zed, and Helix need the same layer against their own diagnostic APIs, and none of that is built.
 
-Attribute completion asks a Python language server (`pyright-langserver` today) what the expression's type offers; when none is installed, member completion is simply absent and everything else still works.
+Attribute completion asks a Python language server what the expression's type offers, taking the first of pyright, basedpyright, `ty server`, pylsp, or jedi found on `PATH`. Pin one with `[tool.types_for_jinja] language_server` if you run several. When none is installed, member completion is simply absent and everything else still works.
+
+## Configuration
+
+Everything lives under `[tool.types_for_jinja]` in `pyproject.toml`, and every setting has a working default.
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `globals` | none | Names your `Environment.globals` injects, as a `name = "Type"` table, so `static_url()` is not a false positive |
+| `imports` | none | Import lines the generated stubs need to resolve the types named in `globals` |
+| `out_dir` | `_jinja_stubs` | Where stubs go. Rejected unless every path segment is an identifier, since the stubs import each other relatively |
+| `suppression` | `portable` | Which ignore comment `{# type: ignore #}` becomes: `portable`, `mypy`, `pyright`, or `ty` |
+| `template_dirs` | none | Where `{% extends %}`, `{% include %}`, and `{% import %}` are resolved from. Accepts `package:subdirectory` |
+| `language_server` | first found | Pins the language server attribute completion asks, instead of taking the first on `PATH` |
+| `syntax` | Jinja's own | Delimiters, using `jinja2.Environment`'s own keyword names |
+| `wrapper` | see below | Options for `types-for-jinja wrapper` |
+
+```toml
+[tool.types_for_jinja]
+imports = ["from collections.abc import Callable"]
+template_dirs = ["myapp:templates"]
+
+[tool.types_for_jinja.globals]
+static_url = "Callable[[str], str]"
+current_route = "str"
+```
 
 ## Suppressing a diagnostic
 
@@ -161,7 +203,7 @@ Templates shipped inside an installed package (what `jinja2.PackageLoader` loads
 template_dirs = ["myapp:templates", "local/templates"]
 ```
 
-Out of scope on purpose: Ansible, Salt, and dbt (untyped runtime contexts and large custom filter libraries, and dbt already has TypeJinja), engines not hosted in Python (Nunjucks, Twig, Liquid, Handlebars), and Python engines with different lookup semantics (Django's DTL, Mako, Chameleon). See [PLAN] for the reasoning.
+Out of scope on purpose: Ansible, Salt, and dbt (untyped runtime contexts and large custom filter libraries, and dbt already has TypeJinja), engines not hosted in Python (Nunjucks, Twig, Liquid, Handlebars), and Python engines with different lookup semantics (Django's DTL, Mako, Chameleon). [DESIGN] gives the reasoning for each.
 
 ## Limitations
 
@@ -170,12 +212,12 @@ Out of scope on purpose: Ansible, Salt, and dbt (untyped runtime contexts and la
 - A template with no line-aligned form (rare; measured under 3% on real template sets) falls back to `# L<n>` markers, which `remap` and the mirror still read, and raw checker output does not.
 - Filter and test argument types are unchecked; only built-in return types are pinned, and unknown filters widen to `Any`.
 - JinjaX component tags (`<Card title={{ x }} />`) have the embedded expressions checked, and the component boundary (attribute names against the component's own `{#def #}`) not yet.
-- Tags from Jinja extensions (`{% trans %}`, `{% do %}`, `{% break %}`) need the extension declared under `[tool.types_for_jinja] extensions` so the parser accepts them; without it the template is skipped with a warning.
+- Tags from Jinja extensions (`{% trans %}`, `{% do %}`, `{% break %}`) fail Jinja's parser unless the extension is loaded, so those templates are skipped with a warning. There is no setting to declare them yet.
 - Templates that exist only behind a `DictLoader` or a database still need a copy on disk to be checked.
 
 ## Project Status
 
-Early and moving. See [PLAN] for the architecture, roadmap, and design decisions, plus the `Open Issues` and the [CODE_TAG_SUMMARY]. For release history, see the [CHANGELOG].
+Early and moving. [DESIGN] holds the settled decisions, the scope boundary, and the measurements they rest on; [BLUE_SKY] holds unscheduled work and why each item is waiting. See also the `Open Issues` and the [CODE_TAG_SUMMARY]. For release history, see the [CHANGELOG].
 
 ## Contributing
 
@@ -205,5 +247,6 @@ If you have any security issue to report, please contact the project maintainers
 [contributor-covenant]: https://www.contributor-covenant.org
 [developer_guide]: https://types-for-jinja.kyleking.me/docs/DEVELOPER_GUIDE
 [license]: https://github.com/kyleking/types-for-jinja/blob/main/LICENSE
-[plan]: https://github.com/kyleking/types-for-jinja/blob/main/PLAN.md
+[blue_sky]: https://github.com/kyleking/types-for-jinja/blob/main/docs/BLUE_SKY.md
+[design]: https://github.com/kyleking/types-for-jinja/blob/main/docs/DESIGN.md
 [style_guide]: https://types-for-jinja.kyleking.me/docs/STYLE_GUIDE

@@ -40,6 +40,7 @@
 
 ### Refactor
 
+- remove the check subcommand and its pyright subprocess
 - **transpile**: expose emitted lines and flag cross-file definitions
 - split out check_source, Diagnostic, and codes/suppress seams
 

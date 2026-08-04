@@ -336,7 +336,7 @@ def _remap_ty_gitlab(payload: str, remapper: Remapper) -> str:
 
 
 def _apply_gitlab(entry: Any, remapper: Remapper) -> None:
-    """GitLab allows either a bare line range or full positions; ty emits positions."""
+    """GitLab allows either a bare line range or full positions, and ty emits positions."""
     location = entry.get('location') if isinstance(entry, dict) else None
     if not isinstance(location, dict) or 'path' not in location:
         return
