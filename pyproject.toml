@@ -14,7 +14,6 @@ authors = [
 classifiers = [
   "Development Status :: 1 - Planning",
   "Operating System :: OS Independent",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
@@ -24,7 +23,7 @@ dependencies = [
   "corallium>=2.2.0",
   "jinja2>=3.1.6",
 ]
-description = "Static type checker for Jinja2 templates and Jinja supersets, via codegen and pyright"
+description = "A mostly invisible type checking and LSP extension for Jinja, JinjaX, and similar templates, built on the pyright, ty, or mypy you already run"
 keywords = ["calcipy_template"]
 license = "MIT"
 maintainers = []

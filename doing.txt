@@ -1,1 +1,0 @@
-After publish: point yak-shears at `types-for-jinja wrapper` and delete the 7 hand-written render_* functions that restate their template's {#def ... #} header. The return-type blocker is gone; set return_type = "HTMLResponse" in [tool.types_for_jinja.wrapper]. render_error also sets an HTTPStatus, so that one stays hand-written and calls the generated function for the render.
