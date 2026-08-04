@@ -1,4 +1,4 @@
-"""Language server that publishes typed-jinja diagnostics to an editor.
+"""Language server that publishes types-for-jinja diagnostics to an editor.
 
 On open, change, and save of a template, it runs the checker and publishes the
 results as LSP diagnostics. It checks the live buffer text while a document is
@@ -14,9 +14,9 @@ from lsprotocol import types as t
 from pygls.lsp.server import LanguageServer
 from pygls.uris import to_fs_path
 
-from typed_jinja.check import Diagnostic, PyrightNotFoundError, check_file, check_source
+from types_for_jinja.check import Diagnostic, PyrightNotFoundError, check_file, check_source
 
-SERVER = LanguageServer('typed-jinja-lsp', '0.0.1')
+SERVER = LanguageServer('types-for-jinja-lsp', '0.0.1')
 
 
 def _to_lsp(diagnostic: Diagnostic) -> t.Diagnostic:
@@ -30,7 +30,7 @@ def _to_lsp(diagnostic: Diagnostic) -> t.Diagnostic:
         message=diagnostic.message,
         severity=severity,
         code=diagnostic.rule or None,
-        source='typed-jinja',
+        source='types-for-jinja',
     )
 
 

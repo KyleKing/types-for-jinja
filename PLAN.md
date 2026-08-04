@@ -1,4 +1,4 @@
-# typed-jinja — implementation plan
+# types-for-jinja — implementation plan
 
 A static type checker for Jinja2 templates, and for Jinja supersets and dialects. It validates the variables, attribute access, and control flow inside a template against a typed context you declare, with no new template language and no runtime cost by default. See "Scope boundary" for what that phrase does and does not include.
 
@@ -22,7 +22,7 @@ Engines not hosted in Python are out for a harder reason. Everything downstream 
 
 Other Python engines are out for a semantic reason. Django's DTL resolves `{{ a.b }}` as dict key, then attribute, then list index, and calls zero-arg callables implicitly, so most dotted access would widen to `Any` and the checker would stop saying anything useful. Its `{% load %}` tags carry signatures that live nowhere in the template. Mako embeds real Python already, which makes it an extraction problem of a different shape. Liquid is forgiving by design, where a missing variable rendering empty is correct behavior, so strict diagnostics read as false positives against the language's own contract.
 
-If this ever reverses, the cost is known. `_emit_node` and `_expr` in `typed_jinja/transpile.py` pattern-match `jinja2.nodes` directly, and `header.py` hardcodes the `{# #}` comment form. A second Python-hosted engine would need an engine-neutral IR between the parser and the emitter, covering the dozen node kinds `_emit_node` already switches on. That is a few hundred lines. Do it when a second engine has a user asking for it.
+If this ever reverses, the cost is known. `_emit_node` and `_expr` in `types_for_jinja/transpile.py` pattern-match `jinja2.nodes` directly, and `header.py` hardcodes the `{# #}` comment form. A second Python-hosted engine would need an engine-neutral IR between the parser and the emitter, covering the dozen node kinds `_emit_node` already switches on. That is a few hundred lines. Do it when a second engine has a user asking for it.
 
 ## Design axes
 
@@ -103,7 +103,7 @@ One source of truth, the header, drives three opt-in levels. This mirrors how th
 
 Two delivery options for Level 2, ship (a) first:
 
-- **(a) Decorate the generated wrappers.** Reuse beartype or Pydantic as-is. No new runtime engine to build. Built as a working proof in `examples/runtime`: `typed_jinja.wrapper.generate_wrapper(header, name, validator=...)` emits the typed function, and `validator='beartype'` decorates it while `validator='pydantic'` validates each parameter through a `TypeAdapter` before rendering. Tests confirm beartype raises on a wrong type and Pydantic coerces a dict then rejects a bad one.
+- **(a) Decorate the generated wrappers.** Reuse beartype or Pydantic as-is. No new runtime engine to build. Built as a working proof in `examples/runtime`: `types_for_jinja.wrapper.generate_wrapper(header, name, validator=...)` emits the typed function, and `validator='beartype'` decorates it while `validator='pydantic'` validates each parameter through a `TypeAdapter` before rendering. Tests confirm beartype raises on a wrong type and Pydantic coerces a dict then rejects a bad one.
 - **(b) A `TypedEnvironment(jinja2.Environment)`** whose `.render()` reads the header, resolves the declared types by evaluating the annotation strings in the header's import namespace (the way `get_type_hints` does), validates the context, then delegates to normal Jinja rendering.
 
 The framing to hold onto: the header is the annotation, pyright is mypy, and the runtime validator is the opt-in enforcement of that same annotation. Default off, because the zero-cost static checker is why people install it.
@@ -177,7 +177,7 @@ v1 is a checker that is quiet (globals), scriptable (JSON/SARIF), and drops into
 - pyright invocation + line remapping
 - Environment globals declaration (kills the `static_url()` false positive)
 - JSON / SARIF output
-- CLI `typed-jinja check <paths>` with non-zero exit on errors
+- CLI `types-for-jinja check <paths>` with non-zero exit on errors
 
 **Landed in v1.1 (see Status above):** the LSP with live-buffer checking, macro bodies, cross-file `{% extends %}`/`{% import %}` context, and rule codes with inline suppression.
 

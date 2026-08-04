@@ -1,4 +1,4 @@
-# typed-jinja
+# types-for-jinja
 
 Type-check your Jinja2 templates. It is mypy for the context you pass to a template.
 
@@ -6,7 +6,7 @@ Type-check your Jinja2 templates. It is mypy for the context you pass to a templ
 
 The variables you hand a Jinja template are untyped. Rename a model field, mistype an attribute, or forget to pass a variable, and nothing tells you until the template renders, often in production and often on a page you did not click through. Jinja's own philosophy keeps the template language loose, so nothing checks that the context matches what the template expects.
 
-typed-jinja closes that gap without a new template language and without changing how Jinja renders. You declare the context once, in a comment, and a type checker validates every variable and attribute the template touches.
+types-for-jinja closes that gap without a new template language and without changing how Jinja renders. You declare the context once, in a comment, and a type checker validates every variable and attribute the template touches.
 
 ## 30-second example
 
@@ -26,7 +26,7 @@ user: User
 Run the checker:
 
 ```console
-$ typed-jinja check templates/
+$ types-for-jinja check templates/
 templates/greeting.html:5:14 error: Cannot access attribute "naem" for class "User" (reportAttributeAccessIssue)
 templates/greeting.html:8:14 error: Cannot access attribute "titel" for class "Item" (reportAttributeAccessIssue)
 ```
@@ -36,28 +36,28 @@ The `{#def #}` block is a plain Jinja comment, so the template renders exactly a
 ## Install
 
 ```console
-uv add typed-jinja      # or: pip install typed-jinja
+uv add types-for-jinja      # or: pip install types-for-jinja
 ```
 
-typed-jinja calls [pyright](https://github.com/microsoft/pyright) to do the type inference, so pyright needs to be on your PATH.
+types-for-jinja calls [pyright](https://github.com/microsoft/pyright) to do the type inference, so pyright needs to be on your PATH.
 
 ## How it works
 
-typed-jinja parses the template's AST with Jinja's own parser, transpiles it into a small Python stub that exercises every expression the template uses, and runs pyright over that stub. Errors are mapped back to the template's own line and column. The stub is thrown away. Jinja still compiles and renders the real template unchanged, so there is no runtime cost and nothing to migrate beyond the one-line header.
+types-for-jinja parses the template's AST with Jinja's own parser, transpiles it into a small Python stub that exercises every expression the template uses, and runs pyright over that stub. Errors are mapped back to the template's own line and column. The stub is thrown away. Jinja still compiles and renders the real template unchanged, so there is no runtime cost and nothing to migrate beyond the one-line header.
 
 Environment globals (for example `static_url` or `url_for`) are declared once in `pyproject.toml` so the checker treats them as defined:
 
 ```toml
-[tool.typed_jinja]
+[tool.types_for_jinja]
 imports = ["from collections.abc import Callable"]
 
-[tool.typed_jinja.globals]
+[tool.types_for_jinja.globals]
 static_url = "Callable[[str], str]"
 ```
 
 ## Runtime checking (optional)
 
-Static checking is the default and costs nothing at runtime. When you also want to validate the context at render time, for example when it comes from a database or an API, typed-jinja can generate a typed wrapper around a template and enforce the types with [beartype](https://github.com/beartype/beartype) or [Pydantic](https://github.com/pydantic/pydantic):
+Static checking is the default and costs nothing at runtime. When you also want to validate the context at render time, for example when it comes from a database or an API, types-for-jinja can generate a typed wrapper around a template and enforce the types with [beartype](https://github.com/beartype/beartype) or [Pydantic](https://github.com/pydantic/pydantic):
 
 ```python
 from beartype import beartype
@@ -72,11 +72,11 @@ Now `render_profile(porfile=...)` is a static error at the call site, and a wron
 
 ## CI and agents
 
-`typed-jinja check --format json` and `--format sarif` emit machine-readable output. The SARIF report plugs into GitHub code scanning and coding agents, so template type errors show up next to your other findings.
+`types-for-jinja check --format json` and `--format sarif` emit machine-readable output. The SARIF report plugs into GitHub code scanning and coding agents, so template type errors show up next to your other findings.
 
 ## Scope
 
-typed-jinja checks Jinja2, and Jinja supersets and dialects, meaning template sets that Jinja's own parser reads. That covers plain Jinja2, JinjaX, and the templates in Flask, Litestar, FastAPI, Copier, and Cookiecutter projects. A superset that adds tags through a Jinja Extension works today as long as it keeps Jinja's standard delimiters, because the checker parses with a default `Environment`. Configurable delimiters are on the roadmap.
+types-for-jinja checks Jinja2, and Jinja supersets and dialects, meaning template sets that Jinja's own parser reads. That covers plain Jinja2, JinjaX, and the templates in Flask, Litestar, FastAPI, Copier, and Cookiecutter projects. A superset that adds tags through a Jinja Extension works today as long as it keeps Jinja's standard delimiters, because the checker parses with a default `Environment`. Configurable delimiters are on the roadmap.
 
 Three things are out of scope on purpose:
 

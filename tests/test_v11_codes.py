@@ -3,10 +3,10 @@
 import json
 from pathlib import Path
 
-from typed_jinja.codes import apply_codes
-from typed_jinja.diagnostic import Diagnostic
-from typed_jinja.report import format_json, format_sarif, format_text
-from typed_jinja.suppress import apply_suppressions
+from types_for_jinja.codes import apply_codes
+from types_for_jinja.diagnostic import Diagnostic
+from types_for_jinja.report import format_json, format_sarif, format_text
+from types_for_jinja.suppress import apply_suppressions
 
 
 def _diag(line, rule, code=''):

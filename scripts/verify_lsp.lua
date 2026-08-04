@@ -1,13 +1,13 @@
--- Headless check that the typed-jinja LSP attaches and publishes diagnostics.
+-- Headless check that the types-for-jinja LSP attaches and publishes diagnostics.
 -- Run from the project root: nvim --headless -l scripts/verify_lsp.lua
 -- Phase 1 checks a bad template on disk. Phase 2 makes an unsaved edit to a
 -- clean template and confirms a diagnostic appears from the live buffer.
 -- Exits 0 only when both phases produce the expected diagnostics.
 
 local root = vim.fn.getcwd()
-local exe = root .. '/.venv/bin/typed-jinja-lsp'
+local exe = root .. '/.venv/bin/types-for-jinja-lsp'
 if not (vim.uv or vim.loop).fs_stat(exe) then
-  exe = 'typed-jinja-lsp'
+  exe = 'types-for-jinja-lsp'
 end
 
 vim.filetype.add({
@@ -15,19 +15,19 @@ vim.filetype.add({
   pattern = { ['.*%.html%.jinja'] = 'jinja' },
 })
 
-vim.lsp.config('typed_jinja', {
+vim.lsp.config('types_for_jinja', {
   cmd = { exe },
   filetypes = { 'jinja', 'html.jinja' },
   root_markers = { 'pyproject.toml', '.git' },
 })
-vim.lsp.enable('typed_jinja')
+vim.lsp.enable('types_for_jinja')
 
 local function open(path)
   vim.cmd.edit(path)
   local buf = vim.api.nvim_get_current_buf()
   vim.bo[buf].filetype = 'jinja'
   vim.wait(20000, function()
-    return #vim.lsp.get_clients({ bufnr = buf, name = 'typed_jinja' }) > 0
+    return #vim.lsp.get_clients({ bufnr = buf, name = 'types_for_jinja' }) > 0
   end, 200)
   return buf
 end

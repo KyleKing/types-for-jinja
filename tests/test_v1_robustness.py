@@ -4,8 +4,8 @@ import shutil
 
 import pytest
 
-from typed_jinja.check import PyrightNotFoundError, check_file
-from typed_jinja.cli import main
+from types_for_jinja.check import PyrightNotFoundError, check_file
+from types_for_jinja.cli import main
 
 _EXIT_MISSING_PYRIGHT = 2
 

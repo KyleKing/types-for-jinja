@@ -1645,7 +1645,7 @@ wheels = [
 ]
 
 [[package]]
-name = "typed-jinja"
+name = "types-for-jinja"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [

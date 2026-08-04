@@ -5,10 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from typed_jinja.check import check_file
-from typed_jinja.config import Config, load_config
-from typed_jinja.header import parse_header
-from typed_jinja.transpile import transpile
+from types_for_jinja.check import check_file
+from types_for_jinja.config import Config, load_config
+from types_for_jinja.header import parse_header
+from types_for_jinja.transpile import transpile
 
 _USES_GLOBALS = Path('examples/templates/uses_globals.html')
 

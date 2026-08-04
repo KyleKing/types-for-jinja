@@ -28,7 +28,7 @@ description = "Static type checker for Jinja2 templates and Jinja supersets, via
 keywords = ["calcipy_template"]
 license = "MIT"
 maintainers = []
-name = "typed_jinja"
+name = "types_for_jinja"
 readme = "docs/README.md"
 requires-python = ">=3.11.9"
 version = "0.0.1"
@@ -39,26 +39,26 @@ pydantic = ["pydantic>=2.0.0"]
 runtime = ["beartype>=0.18.0"]
 
 [project.scripts]
-typed-jinja = "typed_jinja.cli:main"
-typed-jinja-lsp = "typed_jinja.lsp:main"
+types-for-jinja = "types_for_jinja.cli:main"
+types-for-jinja-lsp = "types_for_jinja.lsp:main"
 
 [project.urls]
-"Bug Tracker" = "https://github.com/kyleking/typed-jinja/issues"
-"Changelog" = "https://github.com/kyleking/typed-jinja/blob/main/docs/docs/CHANGELOG.md"
-"Documentation" = "https://typed-jinja.kyleking.me"
-"Repository" = "https://github.com/kyleking/typed-jinja"
+"Bug Tracker" = "https://github.com/kyleking/types-for-jinja/issues"
+"Changelog" = "https://github.com/kyleking/types-for-jinja/blob/main/docs/docs/CHANGELOG.md"
+"Documentation" = "https://types-for-jinja.kyleking.me"
+"Repository" = "https://github.com/kyleking/types-for-jinja"
 
 [tool.commitizen]
 pre_bump_hooks = ["uv lock"]
 version = "0.0.1"
-version_files = ["pyproject.toml:^version", "typed_jinja/__init__.py:^__version"]
+version_files = ["pyproject.toml:^version", "types_for_jinja/__init__.py:^__version"]
 
 [tool.mypy]
 check_untyped_defs = true
 disallow_any_generics = true
 enable_error_code = ["ignore-without-code", "possibly-undefined", "redundant-expr", "truthy-bool"]
 extra_checks = true
-files = ["tests", "typed_jinja"]
+files = ["tests", "types_for_jinja"]
 no_implicit_reexport = true
 plugins = [
 ]
@@ -73,7 +73,7 @@ warn_unused_configs = true
 warn_unused_ignores = true
 
 [tool.pyright]
-include = ["tests", "typed_jinja"]
+include = ["tests", "types_for_jinja"]
 pythonVersion = "3.11"
 
 [tool.ruff]
@@ -131,10 +131,10 @@ inline-quotes = 'single'
 'typing.Protocol'.msg = 'Use "from beartype.typing" instead.'
 
 [tool.ruff.lint.isort]
-known-first-party = ['typed_jinja']
+known-first-party = ['types_for_jinja']
 
 [tool.ruff.lint.per-file-ignores]
-'./typed_jinja/../*.py' = [
+'./types_for_jinja/../*.py' = [
   'implicit-namespace-package', # File `/<>.py` is part of an implicit namespace package. Add an `__init__.py`.
 ]
 '__init__.py' = [
@@ -167,10 +167,10 @@ all = true
 in_place = true
 trailing_comma_inline_array = true
 
-[tool.typed_jinja]
+[tool.types_for_jinja]
 imports = ["from collections.abc import Callable"]
 
-[tool.typed_jinja.globals]
+[tool.types_for_jinja.globals]
 current_route = "str"
 static_url = "Callable[[str], str]"
 
@@ -179,5 +179,5 @@ default-groups = ["dev"]
 required-version = ">=0.9.0"
 
 [tool.uv.build-backend]
-module-name = "typed_jinja"
+module-name = "types_for_jinja"
 module-root = ""

@@ -1,1 +1,1 @@
-"""Example context types and templates for typed-jinja."""
+"""Example context types and templates for types-for-jinja."""

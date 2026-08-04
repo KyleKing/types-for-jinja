@@ -1,10 +1,10 @@
 ---
-site_name: typed_jinja
+site_name: types_for_jinja
 site_author: Kyle King
-site_description: typed_jinja project documentation
-site_url: https://typed-jinja.kyleking.me
-repo_name: kyleking/typed-jinja
-repo_url: https://github.com/kyleking/typed-jinja
+site_description: types_for_jinja project documentation
+site_url: https://types-for-jinja.kyleking.me
+repo_name: kyleking/types-for-jinja
+repo_url: https://github.com/kyleking/types-for-jinja
 edit_uri: edit/main/docs
 docs_dir: docs
 site_dir: releases/site
@@ -20,7 +20,7 @@ theme:
     - toc.autohide
 
 watch:
-  - typed_jinja
+  - types_for_jinja
 
 plugins:
   - gen-files:

@@ -14,9 +14,9 @@ from pathlib import Path
 
 from jinja2 import Environment, TemplateSyntaxError, nodes
 
-from typed_jinja.config import Config
-from typed_jinja.header import TemplateHeader
-from typed_jinja.resolve import resolve_template
+from types_for_jinja.config import Config
+from types_for_jinja.header import TemplateHeader
+from types_for_jinja.resolve import resolve_template
 
 _CMP_OPS = {
     'eq': '==',

@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from typed_jinja.check import check_file, check_source
-from typed_jinja.config import Config
+from types_for_jinja.check import check_file, check_source
+from types_for_jinja.config import Config
 
 pytestmark = pytest.mark.skipif(shutil.which('pyright') is None, reason='pyright is required')
 

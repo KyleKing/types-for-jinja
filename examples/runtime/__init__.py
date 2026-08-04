@@ -1,1 +1,1 @@
-"""Runnable proof of the typed-jinja runtime wrapper (Level 1 and Level 2)."""
+"""Runnable proof of the types-for-jinja runtime wrapper (Level 1 and Level 2)."""

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 
-from typed_jinja.diagnostic import Diagnostic
+from types_for_jinja.diagnostic import Diagnostic
 
 _IGNORE_RE = re.compile(r'\{#-?\s*type:\s*ignore(?:\[(?P<codes>[^\]]*)\])?\s*-?#\}')
 

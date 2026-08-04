@@ -1,14 +1,14 @@
 # Checker backends and batching
 
-Parked design notes from 2026-07-29. The backend and batching work below is unimplemented; `typed_jinja/layout.py` and `typed_jinja/generate.py` are the part that shipped. This exists so the measurements do not have to be redone.
+Parked design notes from 2026-07-29. The backend and batching work below is unimplemented; `types_for_jinja/layout.py` and `types_for_jinja/generate.py` are the part that shipped. This exists so the measurements do not have to be redone.
 
 Measured with pyright 1.1.411 (mise pipx), ty 0.0.61, and mypy 2.3.0 on macOS.
 
-## Why typed-jinja runs the checker itself
+## Why types-for-jinja runs the checker itself
 
-This settles whether "let users bring their own checker" is possible. It is, for most templates, and `typed-jinja generate` is that path. `typed-jinja check` still owns a subprocess and everything below still applies to it.
+This settles whether "let users bring their own checker" is possible. It is, for most templates, and `types-for-jinja generate` is that path. `types-for-jinja check` still owns a subprocess and everything below still applies to it.
 
-The stub is generated Python under `.typed_jinja_cache/`, and every checker reports positions in that file. Compare what typed-jinja prints:
+The stub is generated Python under `.types_for_jinja_cache/`, and every checker reports positions in that file. Compare what types-for-jinja prints:
 
 ```
 templates/page.jinja:5:14 error: Cannot access attribute "nmae" for class "User" (TJ002)
@@ -17,14 +17,14 @@ templates/page.jinja:5:14 error: Cannot access attribute "nmae" for class "User"
 against what `ty check` prints over the same cache directory:
 
 ```
-.typed_jinja_cache/templates_page_jinja.py:7:9: error[unresolved-attribute] Object of type `User` has no attribute `nmae`
+.types_for_jinja_cache/templates_page_jinja.py:7:9: error[unresolved-attribute] Object of type `User` has no attribute `nmae`
 ```
 
-`_template_line` in `typed_jinja/check.py` walks the `# L<n>` markers backwards to turn the first into the second. Whoever owns the subprocess owns the remap.
+`_template_line` in `types_for_jinja/check.py` walks the `# L<n>` markers backwards to turn the first into the second. Whoever owns the subprocess owns the remap.
 
 The way out is to make the remap unnecessary rather than to relocate it. If generated line N is template line N, any checker reports the right line with nothing in between. See the next section for how far that gets.
 
-A post-processor (`ty check --output-format concise | typed-jinja remap`) remains the answer for the templates with no aligned form, and for recovering columns. It parses each checker's stdout, which is the work owning the subprocess already does, so it is worth adding only if those cases start to matter.
+A post-processor (`ty check --output-format concise | types-for-jinja remap`) remains the answer for the templates with no aligned form, and for recovering columns. It parses each checker's stdout, which is the work owning the subprocess already does, so it is worth adding only if those cases start to matter.
 
 One real point survives regardless: `_write_pyright_config` writes a fresh `pyrightconfig.json` and ignores whatever the project already configured, so the stub is checked under different settings than the project's own source. That matters most for a project using the mypy pydantic plugin, or custom stub paths. Backend discovery answers "which binary" and does not answer "under whose config". Decide separately.
 
@@ -40,7 +40,7 @@ Measured over 126 templates, 11 from `examples/` and 115 real ones from mkdocs-m
 
 Against the 9 example templates carrying a real `{#def #}` header, the aligned stubs checked by raw pyright produce diagnostics identical to `check_file`, 9 of 9.
 
-Both checkers find the same three errors on the same lines in a generated stub, with no typed-jinja process running:
+Both checkers find the same three errors on the same lines in a generated stub, with no types-for-jinja process running:
 
 ```
 _jinja_stubs/templates/profile_html.py:5:10  - error: Cannot access attribute "naem" for class "User"
@@ -63,7 +63,7 @@ What it does not do:
 - `{% else %}` sharing a physical line with its branch has no aligned form, which is all 3 fallbacks
 - `loop` is bound at module level, so using `loop` outside a `{% for %}` is not flagged
 
-The output directory must not start with a dot. Pyright excludes `**/.*` by default and reports a clean run over zero files, which is why the default is `_jinja_stubs` and not `.typed_jinja`. Stub paths mirror the template tree with only the filename mangled, because a module name cannot carry the template's extension.
+The output directory must not start with a dot. Pyright excludes `**/.*` by default and reports a clean run over zero files, which is why the default is `_jinja_stubs` and not `.types_for_jinja`. Stub paths mirror the template tree with only the filename mangled, because a module name cannot carry the template's extension.
 
 ## All three backends agree
 
@@ -140,10 +140,10 @@ Seven test files gate on `shutil.which('pyright')`, several assert on literal py
 ## Open questions
 
 - Make `ty` a hard dependency? It is a zero-dependency wheel on PyPI, so it guarantees every install has a working backend and removes the `PyrightNotFoundError` path entirely. Against it: ty is pre-1.0, and its diagnostics still move between releases
-- If discovery stays, default order ty then pyright then mypy, with `[tool.typed_jinja] checker` to pin. The resolved backend should appear in the summary line so a CI failure that does not reproduce locally is diagnosable
+- If discovery stays, default order ty then pyright then mypy, with `[tool.types_for_jinja] checker` to pin. The resolved backend should appear in the summary line so a CI failure that does not reproduce locally is diagnosable
 - Whether to read the project's existing checker config instead of writing our own
 - Whether `generate` becomes the default and `check` becomes the fallback for the aligned minority, which would drop the runtime dependency set to jinja2 alone
-- Staleness for `generate`. `--check` gates it, but committing the stubs is what makes a fresh clone typecheck correctly before anyone runs typed-jinja
+- Staleness for `generate`. `--check` gates it, but committing the stubs is what makes a fresh clone typecheck correctly before anyone runs types-for-jinja
 - Three templates crash `transpile()` with `_UnsupportedError` escaping to the caller (`_emit_for` calls `_target` uncaught, among others), which takes down a whole run rather than skipping one template
 - `pyright[nodejs]` on PyPI bundles node through `nodejs-wheel-binaries`, and `basedpyright` requires it unconditionally. Either removes the "pyright must be on PATH" problem without changing the inference engine, if staying on pyright turns out to matter
 

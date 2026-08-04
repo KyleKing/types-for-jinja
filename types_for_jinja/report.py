@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from typed_jinja.diagnostic import Diagnostic
+from types_for_jinja.diagnostic import Diagnostic
 
 _SARIF_SCHEMA = 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json'
 _SARIF_LEVELS = {'error': 'error', 'warning': 'warning'}
@@ -40,7 +40,7 @@ def format_sarif(diags: list[Diagnostic]) -> str:
         'version': '2.1.0',
         'runs': [
             {
-                'tool': {'driver': {'name': 'typed-jinja', 'rules': _sarif_rules(diags)}},
+                'tool': {'driver': {'name': 'types-for-jinja', 'rules': _sarif_rules(diags)}},
                 'results': [_sarif_result(diag) for diag in diags],
             },
         ],
@@ -60,7 +60,7 @@ def _sarif_rules(diags: list[Diagnostic]) -> list[dict[str, str]]:
 
 def _sarif_result(diag: Diagnostic) -> dict[str, Any]:
     return {
-        'ruleId': diag.code or diag.rule or 'typed-jinja',
+        'ruleId': diag.code or diag.rule or 'types-for-jinja',
         'level': _SARIF_LEVELS.get(diag.severity, 'warning'),
         'message': {'text': diag.message},
         'properties': {'pyrightRule': diag.rule},

@@ -2,7 +2,7 @@
 
 The stubs are ordinary Python modules. Point mypy, pyright, ty, or anything else at the
 output directory and template errors appear in that one run, reported against the
-template's own file and line. typed-jinja never invokes a type checker in this mode.
+template's own file and line. types-for-jinja never invokes a type checker in this mode.
 """
 
 from __future__ import annotations
@@ -12,10 +12,10 @@ from pathlib import Path
 
 from jinja2 import TemplateSyntaxError
 
-from typed_jinja.config import Config, load_config
-from typed_jinja.header import parse_header
-from typed_jinja.layout import layout
-from typed_jinja.transpile import transpile
+from types_for_jinja.config import Config, load_config
+from types_for_jinja.header import parse_header
+from types_for_jinja.layout import layout
+from types_for_jinja.transpile import transpile
 
 _SIDECAR_SUFFIX = '_tj_shared'
 

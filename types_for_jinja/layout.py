@@ -16,11 +16,11 @@ from collections import defaultdict
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
-from typed_jinja.transpile import Line
+from types_for_jinja.transpile import Line
 
 if TYPE_CHECKING:
-    from typed_jinja.header import TemplateHeader
-    from typed_jinja.transpile import GeneratedModule
+    from types_for_jinja.header import TemplateHeader
+    from types_for_jinja.transpile import GeneratedModule
 
 _LOOP_BINDING = 'loop = _tj_loop'
 _SCAFFOLD = (

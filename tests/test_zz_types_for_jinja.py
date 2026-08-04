@@ -4,7 +4,7 @@ from pathlib import Path
 
 from corallium.tomllib import tomllib
 
-from typed_jinja import __version__
+from types_for_jinja import __version__
 
 
 def test_version():

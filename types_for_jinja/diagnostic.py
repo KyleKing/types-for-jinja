@@ -10,7 +10,7 @@ from pathlib import Path
 class Diagnostic:
     """A type error located back in the original template.
 
-    ``rule`` is pyright's own rule name. ``code`` is the stable typed-jinja code
+    ``rule`` is pyright's own rule name. ``code`` is the stable types-for-jinja code
     (for example ``TJ001``) assigned from ``rule``, empty when unmapped.
     """
 

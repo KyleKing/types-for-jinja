@@ -1,4 +1,4 @@
-"""Load project configuration for typed-jinja from ``pyproject.toml``."""
+"""Load project configuration for types-for-jinja from ``pyproject.toml``."""
 
 from __future__ import annotations
 
@@ -17,11 +17,11 @@ class Config:
 
 
 def load_config(root: Path) -> Config:
-    """Read ``[tool.typed_jinja]`` from ``root/pyproject.toml``; empty ``Config`` if absent."""
+    """Read ``[tool.types_for_jinja]`` from ``root/pyproject.toml``; empty ``Config`` if absent."""
     pyproject = root / 'pyproject.toml'
     if not pyproject.is_file():
         return Config()
-    table = tomllib.loads(pyproject.read_text(encoding='utf-8')).get('tool', {}).get('typed_jinja')
+    table = tomllib.loads(pyproject.read_text(encoding='utf-8')).get('tool', {}).get('types_for_jinja')
     if not table:
         return Config()
     declared = table.get('globals', {})

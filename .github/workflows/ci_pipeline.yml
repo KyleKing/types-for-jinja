@@ -7,7 +7,7 @@ name: CI Pipeline
   pull_request:
     paths:
       - .github/workflows/ci_pipeline.yml
-      - typed_jinja/**
+      - types_for_jinja/**
       - tests/**
       - uv.lock
       - pyproject.toml

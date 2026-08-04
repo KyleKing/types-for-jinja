@@ -11,8 +11,8 @@ import shutil
 import subprocess  # ruff:ignore[suspicious-subprocess-import]
 from pathlib import Path
 
-from typed_jinja.header import parse_header
-from typed_jinja.wrapper import Validator, generate_wrapper
+from types_for_jinja.header import parse_header
+from types_for_jinja.wrapper import Validator, generate_wrapper
 
 _HERE = Path(__file__).parent
 _TEMPLATE = _HERE / 'templates' / 'profile.html.jinja'

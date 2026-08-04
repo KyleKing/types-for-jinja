@@ -2,6 +2,6 @@
 
 from pprint import pprint
 
-from typed_jinja import replace_me
+from types_for_jinja import replace_me
 
 pprint(locals())  # ruff:ignore[p-print]

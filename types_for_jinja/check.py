@@ -11,15 +11,15 @@ from typing import Any
 
 from jinja2 import TemplateSyntaxError
 
-from typed_jinja.codes import apply_codes
-from typed_jinja.config import Config, load_config
-from typed_jinja.diagnostic import Diagnostic
-from typed_jinja.header import parse_header
-from typed_jinja.suppress import apply_suppressions
-from typed_jinja.transpile import transpile
+from types_for_jinja.codes import apply_codes
+from types_for_jinja.config import Config, load_config
+from types_for_jinja.diagnostic import Diagnostic
+from types_for_jinja.header import parse_header
+from types_for_jinja.suppress import apply_suppressions
+from types_for_jinja.transpile import transpile
 
 _MARKER_RE = re.compile(r'#\s*L(\d+)\s*$')
-_CACHE_DIR = Path('.typed_jinja_cache')
+_CACHE_DIR = Path('.types_for_jinja_cache')
 
 __all__ = ['Diagnostic', 'PyrightNotFoundError', 'check_file', 'check_source']
 

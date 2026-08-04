@@ -7,7 +7,7 @@ from os import getenv
 from typing import Self
 from warnings import filterwarnings
 
-NAME = 'typed_jinja'.upper()
+NAME = 'types_for_jinja'.upper()
 """Package name to allow more targeted usage."""
 
 

@@ -25,6 +25,11 @@ Open items, priority order.
    that generate_wrapper returns Markup while yak-shears' helpers return
    starlette.responses.HTMLResponse (and render_error also sets an
    HTTPStatus), and some helpers do real work before rendering. Decide
-   whether typed-jinja grows a "wrap the render in a caller-supplied
+   whether types-for-jinja grows a "wrap the render in a caller-supplied
    callable" option, or yak-shears keeps its helpers and only generates the
    inner typed render.
+
+5. Rename follow-up: package, CLI, docs, and .copier-answers.yml now read
+   types-for-jinja / types_for_jinja. Still needs the git remote pointed at
+   the renamed GitHub repo and a check that the reserved PyPI name matches
+   pyproject.toml exactly before the item-1 publish.

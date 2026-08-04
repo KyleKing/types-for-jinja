@@ -10,8 +10,8 @@ from pydantic import ValidationError
 
 from examples.runtime import wrapper_beartype, wrapper_pydantic
 from examples.runtime.models import Profile
-from typed_jinja.header import parse_header
-from typed_jinja.wrapper import generate_wrapper
+from types_for_jinja.header import parse_header
+from types_for_jinja.wrapper import generate_wrapper
 
 _TEMPLATE = Path('examples/runtime/templates/profile.html.jinja')
 

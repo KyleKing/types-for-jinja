@@ -3,8 +3,8 @@
 ## Local Development
 
 ```sh
-git clone https://github.com/kyleking/typed-jinja.git
-cd typed-jinja
+git clone https://github.com/kyleking/types-for-jinja.git
+cd types-for-jinja
 uv sync --all-extras
 
 # See the available tasks
@@ -49,9 +49,9 @@ Repository Settings → Environments:
 
 **Register Trusted Publishers**
 
-PyPI: https://pypi.org/manage/project/typed_jinja/settings/publishing/
+PyPI: https://pypi.org/manage/project/types_for_jinja/settings/publishing/
 - Owner: `kyleking`
-- Repository: `typed-jinja`
+- Repository: `types-for-jinja`
 - Workflow: `publish.yml`
 - Environment: `pypi`
     - Or environment `testpypi` (for [TestPyPI](https://test.pypi.org/manage/account/publishing))

@@ -1,4 +1,4 @@
-"""Command-line entry point: ``typed-jinja check <paths> [--format ...]``."""
+"""Command-line entry point: ``types-for-jinja check <paths> [--format ...]``."""
 
 from __future__ import annotations
 
@@ -6,9 +6,9 @@ import argparse
 import sys
 from pathlib import Path
 
-from typed_jinja.check import Diagnostic, PyrightNotFoundError, check_file
-from typed_jinja.generate import generate, stale, write
-from typed_jinja.report import format_json, format_sarif, format_text
+from types_for_jinja.check import Diagnostic, PyrightNotFoundError, check_file
+from types_for_jinja.generate import generate, stale, write
+from types_for_jinja.report import format_json, format_sarif, format_text
 
 _FORMATTERS = {'text': format_text, 'json': format_json, 'sarif': format_sarif}
 
@@ -27,14 +27,14 @@ def _iter_templates(paths: list[Path]) -> list[Path]:
 def _generate(templates: list[Path], out_dir: Path, *, check_only: bool) -> int:
     generated = generate(templates, out_dir)
     for template, reason in generated.skipped:
-        print(f'typed-jinja: skipped {template}: {reason}', file=sys.stderr)  # ruff:ignore[print]
+        print(f'types-for-jinja: skipped {template}: {reason}', file=sys.stderr)  # ruff:ignore[print]
     for template in generated.unaligned:
-        message = f'typed-jinja: {template} has no line-aligned form; its stub uses # L markers instead'
+        message = f'types-for-jinja: {template} has no line-aligned form; its stub uses # L markers instead'
         print(message, file=sys.stderr)  # ruff:ignore[print]
     if check_only:
         outdated = stale(generated)
         for path in outdated:
-            print(f'typed-jinja: out of date: {path}', file=sys.stderr)  # ruff:ignore[print]
+            print(f'types-for-jinja: out of date: {path}', file=sys.stderr)  # ruff:ignore[print]
         return 1 if outdated else 0
     changed = write(generated, out_dir)
     summary = f'Wrote {len(changed)} of {len(generated.files)} stub(s) for {len(generated.stubs)} template(s)'
@@ -44,7 +44,7 @@ def _generate(templates: list[Path], out_dir: Path, *, check_only: bool) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     """Run the checker over the given paths; return a non-zero exit code on errors."""
-    parser = argparse.ArgumentParser(prog='typed-jinja')
+    parser = argparse.ArgumentParser(prog='types-for-jinja')
     subparsers = parser.add_subparsers(dest='command', required=True)
     check_parser = subparsers.add_parser('check', help='type-check Jinja templates')
     check_parser.add_argument('paths', nargs='+', type=Path, help='template files or directories')
@@ -74,7 +74,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         diagnostics: list[Diagnostic] = [diag for template in templates for diag in check_file(template)]
     except PyrightNotFoundError:
-        message = 'typed-jinja: pyright not found on PATH; install it (for example `uv tool install pyright`)'
+        message = 'types-for-jinja: pyright not found on PATH; install it (for example `uv tool install pyright`)'
         print(message, file=sys.stderr)  # ruff:ignore[print]
         return 2
     error_count = sum(diag.severity == 'error' for diag in diagnostics)

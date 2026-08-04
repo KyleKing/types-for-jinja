@@ -1,7 +1,7 @@
 """Transpiler resilience on real-world Jinja constructs (no pyright needed)."""
 
-from typed_jinja.header import parse_header
-from typed_jinja.transpile import transpile
+from types_for_jinja.header import parse_header
+from types_for_jinja.transpile import transpile
 
 
 def _code(source):

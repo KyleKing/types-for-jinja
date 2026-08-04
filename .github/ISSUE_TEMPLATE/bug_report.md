@@ -5,7 +5,7 @@ assignees: kyleking
 ---
 
 **Describe the bug**
-<!-- Describe the bug and any other relevant information, such as: `typed_jinja` version, Operating System Type and Version (MacOS 13.2 vs. Window 8), etc.  -->
+<!-- Describe the bug and any other relevant information, such as: `types_for_jinja` version, Operating System Type and Version (MacOS 13.2 vs. Window 8), etc.  -->
 
 **To Reproduce**
 <!-- What steps or code snippets can allow someone else to replicate the issue -->

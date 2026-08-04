@@ -3,8 +3,8 @@
 import json
 from pathlib import Path
 
-from typed_jinja.diagnostic import Diagnostic
-from typed_jinja.report import format_json, format_sarif, format_text
+from types_for_jinja.diagnostic import Diagnostic
+from types_for_jinja.report import format_json, format_sarif, format_text
 
 _DIAGS = [
     Diagnostic(Path('a.html'), 5, 12, 'error', 'Cannot access attribute "naem"', 'reportAttributeAccessIssue', 'TJ002'),
@@ -38,7 +38,7 @@ def test_format_sarif_is_valid_2_1_0():
 
     assert document['version'] == '2.1.0'
     run = document['runs'][0]
-    assert run['tool']['driver']['name'] == 'typed-jinja'
+    assert run['tool']['driver']['name'] == 'types-for-jinja'
     assert len(run['results']) == len(_DIAGS)
     first = run['results'][0]
     assert first['ruleId'] == 'TJ002'

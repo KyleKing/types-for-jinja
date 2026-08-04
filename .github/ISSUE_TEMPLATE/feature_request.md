@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Please share your ideas for typed_jinja!
+about: Please share your ideas for types_for_jinja!
 assignees: kyleking
 ---
 
