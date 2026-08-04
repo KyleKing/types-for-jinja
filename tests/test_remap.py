@@ -28,7 +28,7 @@ def project(tmp_path, monkeypatch):
     """A generated stub tree over the fixture project, with the checker's cwd at its root."""
     monkeypatch.chdir(tmp_path)
     backends.write_project(tmp_path)
-    write(generate([Path(TEMPLATE_PATH)], Path(STUB_DIR)))
+    write(generate(sorted(Path('templates').glob('*.jinja')), Path(STUB_DIR)))
     return tmp_path
 
 
@@ -102,6 +102,24 @@ def test_the_format_is_detected_without_being_named(invocation, project):
     payload = capture(invocation, project)
 
     assert detect(payload) != 'auto'
+
+
+@pytest.mark.parametrize('invocation', [_params(entry) for entry in INVOCATIONS])
+def test_a_generated_import_resolves_with_no_search_path_configuration(invocation, project):
+    """The pitch is one generate call and the checker you already run, with nothing else set up.
+
+    A stub imports the filter signature module and its macro sidecar by bare module name. If
+    a backend cannot find those, every template using a filter reports an import error.
+    """
+    payload = capture(invocation, project)
+
+    unresolved = [
+        entry
+        for entry in invocation.locations(payload)
+        if any(word in entry[3].lower() for word in ('import', '_tj_filters', '_tj_shared'))
+    ]
+
+    assert unresolved == []
 
 
 def test_a_path_outside_the_stub_tree_is_left_alone(remapper):

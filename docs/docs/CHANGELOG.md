@@ -2,6 +2,7 @@
 
 ### Feat
 
+- **cli**: add remap to name templates in checker output
 - **generate**: record each stub's template in a manifest
 - **generate**: make the stubs check clean under ty, mypy, and pyright
 - **lsp**: complete attributes by asking pyright what the type offers

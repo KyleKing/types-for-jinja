@@ -59,6 +59,34 @@ user: User
 
 TEMPLATE_PATH = 'templates/page.html.jinja'
 
+MACROS = """\
+{% macro row(item) %}
+{#def
+from app.models import Item
+item: Item
+#}
+<td>{{ item.title }}</td>
+{% endmacro %}
+"""
+
+IMPORTS_AND_FILTERS = """\
+{#def
+from app.models import User
+user: User
+#}
+{% from 'macros.html.jinja' import row %}
+<p>{{ user.items | length }}</p>
+<p>{{ user.name | upper }}</p>
+{% for item in user.items | sort %}{{ row(item) }}{% endfor %}
+"""
+"""Exercises the two generated imports a stub can carry: the filter module and a sidecar.
+
+Both are bare top-level module names, so this is the regression test for the claim that a
+project needs no search-path configuration beyond pointing its checker at the tree.
+"""
+
+FILTERS_PATH = 'templates/filtered.html.jinja'
+
 PROJECT_ERROR = """\
 def broken() -> int:
     return 'not an int'
@@ -79,6 +107,8 @@ def write_project(root: Path) -> None:
     (root / 'app/models.py').write_text(MODELS, encoding='utf-8')
     (root / PROJECT_ERROR_PATH).write_text(PROJECT_ERROR, encoding='utf-8')
     (root / TEMPLATE_PATH).write_text(TEMPLATE, encoding='utf-8')
+    (root / FILTERS_PATH).write_text(IMPORTS_AND_FILTERS, encoding='utf-8')
+    (root / 'templates/macros.html.jinja').write_text(MACROS, encoding='utf-8')
     (root / 'pyrightconfig.json').write_text(json.dumps({'include': ['.'], 'extraPaths': ['.']}), encoding='utf-8')
 
 

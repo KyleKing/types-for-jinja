@@ -75,14 +75,24 @@ def _sidecar(preamble: list[Line], foreign: list[Line], header: TemplateHeader) 
     The sidecar needs the same bound names the aligned stub has. A bare annotation would
     leave every global unbound and every header parameter undefined, so the real errors
     from the other template would be buried.
+
+    A sidecar always sits at the root of the output tree even when its stub is nested, so its
+    inherited relative imports are re-pointed to that depth.
     """
     if not foreign:
         return ''
     body = [
-        *_flatten_preamble(preamble, header),
+        *(replace(line, text=_at_root(line.text)) for line in _flatten_preamble(preamble, header)),
         *(replace(line, indent=max(line.indent - 1, 0)) for line in foreign),
     ]
     return '\n'.join('    ' * line.indent + line.text for line in body) + '\n'
+
+
+def _at_root(text: str) -> str:
+    """Rewrite a generated relative import for a module living at the output root."""
+    if not text.startswith('from .'):
+        return text
+    return f'from .{text[len("from ") :].lstrip(".")}'
 
 
 def _unwrap_render(body: list[Line]) -> list[Line]:

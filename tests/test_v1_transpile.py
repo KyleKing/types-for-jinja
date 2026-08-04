@@ -38,7 +38,7 @@ def test_include_does_not_crash():
 def test_known_filter_uses_its_declared_signature():
     code = _code('{#def items: list[int] #}\n{{ items | length }}')
 
-    assert 'from _tj_filters import _tj_f_length' in code
+    assert 'from ._tj_filters import _tj_f_length' in code
     assert '_tj_f_length(items)' in code
 
 
@@ -52,7 +52,7 @@ def test_unknown_filter_still_falls_back_to_any():
 def test_test_expression_uses_the_boolean_signature():
     code = _code('{#def x: int #}\n{% if x is divisibleby 3 %}y{% endif %}')
 
-    assert 'from _tj_filters import _tj_test' in code
+    assert 'from ._tj_filters import _tj_test' in code
     assert '_tj_test(x, 3)' in code
 
 

@@ -16,6 +16,7 @@ from jinja2 import Environment, TemplateSyntaxError, nodes
 
 from types_for_jinja import filters
 from types_for_jinja.config import Config, Syntax
+from types_for_jinja.emit import relative_module
 from types_for_jinja.header import TemplateHeader, parse_defs
 from types_for_jinja.resolve import resolve_template, search_paths
 
@@ -130,6 +131,7 @@ def transpile(
     header: TemplateHeader,
     config: Config | None = None,
     template_path: Path | None = None,
+    depth: int = 0,
 ) -> GeneratedModule:
     """Transpile ``source`` into a Python stub checkable against ``header``'s context.
 
@@ -137,6 +139,8 @@ def transpile(
     ``static_url``) so a template that references them is not flagged as undefined.
     ``template_path`` locates the template on disk so ``extends`` / ``import`` /
     ``from import`` references can be resolved against it and ``config.template_dirs``.
+    ``depth`` is how far below the output root the stub will sit, which sets the leading dots
+    on its relative import of the generated filter signatures.
     """
     config = config or Config()
     env = build_environment(config.syntax)
@@ -151,7 +155,7 @@ def transpile(
     )
     split = _split_top_level(tree, ctx)
 
-    lines = _preamble(header, config, [*macro_imports, *split.imports, *filter_imports(tree)])
+    lines = _preamble(header, config, [*macro_imports, *split.imports, *filter_imports(tree, depth)])
     preamble_len = len(lines)
     lines.extend(split.foreign_defs)
     lines.extend(split.module_defs)
@@ -652,7 +656,7 @@ def _filter_callable(node: nodes.Filter | nodes.Test) -> str:
     return filters.stub_name(node.name) if node.name in filters.RETURNS else '_tj_any'
 
 
-def filter_imports(tree: nodes.Template) -> list[str]:
+def filter_imports(tree: nodes.Template, depth: int = 0) -> list[str]:
     """The names a stub for ``tree`` must import from the generated filter module."""
     used = {
         filters.stub_name(node.name)
@@ -661,7 +665,8 @@ def filter_imports(tree: nodes.Template) -> list[str]:
     }
     if any(node.node is not None for node in tree.find_all(nodes.Test)):
         used.add(filters.TEST_STUB)
-    return [f'from {filters.MODULE_NAME} import {", ".join(sorted(used))}'] if used else []
+    module = relative_module(filters.MODULE_NAME, depth)
+    return [f'from {module} import {", ".join(sorted(used))}'] if used else []
 
 
 def _slice(node: nodes.Slice) -> str:

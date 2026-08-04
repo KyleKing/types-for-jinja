@@ -79,11 +79,11 @@ uv publish
 | `types_for_jinja/complete.py`                  | 189        | 13      | 0        | 90.3%    |
 | `types_for_jinja/config.py`                    | 49         | 1       | 0        | 96.4%    |
 | `types_for_jinja/diagnostic.py`                | 12         | 0       | 0        | 100.0%   |
-| `types_for_jinja/emit.py`                      | 25         | 0       | 0        | 100.0%   |
+| `types_for_jinja/emit.py`                      | 34         | 0       | 0        | 100.0%   |
 | `types_for_jinja/filters.py`                   | 19         | 0       | 0        | 100.0%   |
-| `types_for_jinja/generate.py`                  | 96         | 3       | 0        | 96.4%    |
+| `types_for_jinja/generate.py`                  | 98         | 4       | 0        | 95.6%    |
 | `types_for_jinja/header.py`                    | 52         | 0       | 0        | 98.4%    |
-| `types_for_jinja/layout.py`                    | 170        | 11      | 0        | 89.1%    |
+| `types_for_jinja/layout.py`                    | 174        | 11      | 0        | 89.3%    |
 | `types_for_jinja/lsp.py`                       | 163        | 28      | 0        | 77.8%    |
 | `types_for_jinja/manifest.py`                  | 53         | 1       | 0        | 96.6%    |
 | `types_for_jinja/members.py`                   | 121        | 14      | 0        | 85.4%    |
@@ -91,9 +91,9 @@ uv publish
 | `types_for_jinja/report.py`                    | 22         | 0       | 0        | 100.0%   |
 | `types_for_jinja/resolve.py`                   | 21         | 2       | 0        | 92.6%    |
 | `types_for_jinja/suppress.py`                  | 44         | 0       | 0        | 100.0%   |
-| `types_for_jinja/transpile.py`                 | 406        | 64      | 0        | 81.9%    |
+| `types_for_jinja/transpile.py`                 | 408        | 64      | 0        | 81.9%    |
 | `types_for_jinja/wrapper.py`                   | 85         | 2       | 0        | 96.3%    |
-| **Totals**                                     | 1978       | 191     | 37       | 87.2%    |
+| **Totals**                                     | 1995       | 192     | 37       | 87.3%    |
 
 Generated on: 2026-08-04
 <!-- {cte} -->

@@ -15,7 +15,15 @@ from jinja2 import TemplateSyntaxError
 
 from types_for_jinja import filters, manifest
 from types_for_jinja.config import Config, load_config
-from types_for_jinja.emit import flat_name, mirrored_path, package_markers, stale_files, write_files
+from types_for_jinja.emit import (
+    depth_of,
+    flat_name,
+    mirrored_path,
+    package_markers,
+    relative_module,
+    stale_files,
+    write_files,
+)
 from types_for_jinja.header import parse_header
 from types_for_jinja.layout import layout
 from types_for_jinja.suppress import annotate
@@ -138,18 +146,20 @@ def _stub_for(template: Path, out_dir: Path, config: Config) -> Stub | str:
     header = parse_header(source, config.syntax)
     if header is None:
         return 'no {#def ... #} type header'
+    stub_path = mirrored_path(template, out_dir)
+    depth = depth_of(stub_path, out_dir)
     try:
-        module = transpile(source, header, config, template_path=template)
+        module = transpile(source, header, config, template_path=template, depth=depth)
     except TemplateSyntaxError as err:
         return f'template syntax error: {err.message}'
     except UnsupportedTemplateError as err:
         return f'unsupported template construct: {err}'
-    stub_path = mirrored_path(template, out_dir)
     shared = f'{flat_name(template)}{_SIDECAR_SUFFIX}'
-    aligned = layout(module, header, shared)
+    aligned = layout(module, header, relative_module(shared, depth))
     if aligned is None:
         marked = annotate(module.code, source, config.suppression, aligned=False)
-        return Stub(template=template, path=stub_path, files={stub_path: marked}, aligned=False)
+        marker_files = {stub_path: marked, **package_markers(out_dir, stub_path)}
+        return Stub(template=template, path=stub_path, files=marker_files, aligned=False)
     code = annotate(aligned.code, source, config.suppression, aligned=True)
     files = {stub_path: code, **package_markers(out_dir, stub_path)}
     if aligned.sidecar:
