@@ -84,6 +84,22 @@ JinjaX writes the whole context on one line, with commas between, defaults allow
 
 A name with no annotation is `Any`, so it is declared without being constrained. A default is carried into the generated wrapper's signature, so callers do not have to repeat it.
 
+JinjaX component tags are checked against the component's own header. Point `template_dirs` at the component directory and a use is validated for missing required attributes and for attribute types:
+
+```jinja
+{#def title: str, count: int = 0 #}   <!-- components/Card.jinja -->
+
+<Card count={{ user.name }} class="wide" />
+```
+
+```console
+$ types-for-jinja remap -- ty check
+templates/page.html.jinja:6:16: error[missing-argument] No argument provided for required parameter `title`
+templates/page.html.jinja:6:7: error[invalid-argument-type] Expected `int`, found `str`
+```
+
+An attribute the component does not declare is not an error, because JinjaX forwards it to the component as `attrs`, which is what `class="wide"` above relies on.
+
 Jinja's built-in filters carry their return type, so a filtered expression is still checked: `{{ items | length }}` is an `int`, and `{% for x in items | sort %}` still knows what `x` is. Only the return type is pinned, because a filter catalog that guesses at argument types reports errors on correct templates. A filter the catalog does not know (yours, or one from an extension) falls back to `Any`.
 
 ## Installation
@@ -219,7 +235,7 @@ Out of scope on purpose: Ansible, Salt, and dbt (untyped runtime contexts and la
 - Stubs must be regenerated when templates change. `generate --check` in pre-commit or CI catches a stale one; the LSP regenerates on edit.
 - A template with no line-aligned form (rare; measured under 3% on real template sets) falls back to `# L<n>` markers, which `remap` and the mirror still read, and raw checker output does not.
 - Filter and test argument types are unchecked; only built-in return types are pinned, and unknown filters widen to `Any`.
-- JinjaX component tags (`<Card title={{ x }} />`) have the embedded expressions checked, and the component boundary (attribute names against the component's own `{#def #}`) not yet.
+- A JinjaX component tag that cannot be resolved to a file is skipped, which includes any tag carrying a catalog prefix (`<ui:Button />`), because the prefix maps to a search path that lives in the catalog rather than in the template.
 - Tags from Jinja extensions (`{% trans %}`, `{% do %}`, `{% break %}`) fail Jinja's parser unless the extension is loaded, so those templates are skipped with a warning. There is no setting to declare them yet.
 - Templates that exist only behind a `DictLoader` or a database still need a copy on disk to be checked.
 

@@ -14,7 +14,7 @@ from pathlib import Path
 
 from jinja2 import Environment, TemplateSyntaxError, nodes
 
-from types_for_jinja import filters
+from types_for_jinja import components, filters
 from types_for_jinja.config import Config, Syntax
 from types_for_jinja.emit import relative_module
 from types_for_jinja.header import TemplateHeader, parse_defs
@@ -158,8 +158,10 @@ def transpile(
     )
     split = _split_top_level(tree, ctx)
 
+    uses, component_defs = _component_uses(source, ctx.search_dirs)
     lines = _preamble(header, config, [*macro_imports, *split.imports, *filter_imports(tree, depth)])
     preamble_len = len(lines)
+    lines.extend(_mark_foreign(component_defs, header.lineno))
     lines.extend(split.foreign_defs)
     lines.extend(split.module_defs)
 
@@ -170,6 +172,8 @@ def transpile(
     inherited: list[Line] = []
     _emit_body(split.base_nodes, inherited, 1, ctx)
     body.extend(_mark_foreign(inherited, split.base_lineno))
+    body.extend(Line(1, use.call, use.lineno) for use in uses)
+    body.sort(key=lambda line: line.lineno)
     if not body:
         body.append(Line(1, 'pass', header.lineno))
     lines.extend(body)
@@ -250,6 +254,26 @@ def _mark_foreign(lines: list[Line], lineno: int) -> list[Line]:
     that brought it here.
     """
     return [replace(line, foreign=True, lineno=lineno) for line in lines]
+
+
+def _component_uses(source: str, search_dirs: list[Path]) -> tuple[list[components.Use], list[Line]]:
+    """Pair each resolvable JinjaX component tag with the signature it is checked against.
+
+    A tag whose component cannot be found is dropped rather than guessed at, so a project that
+    registers components through a catalog prefix keeps checking everything else.
+    """
+    resolved: list[components.Use] = []
+    defs: list[Line] = []
+    seen: set[str] = set()
+    for use in components.find_uses(source):
+        component = components.resolve_component(use.tag, search_dirs)
+        if component is None:
+            continue
+        resolved.append(use)
+        if use.callable_name not in seen:
+            seen.add(use.callable_name)
+            defs.append(Line(0, components.signature(use, component, _ANY), use.lineno))
+    return resolved, defs
 
 
 def _search_dirs(template_path: Path | None, config: Config) -> list[Path]:

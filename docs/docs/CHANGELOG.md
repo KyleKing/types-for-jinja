@@ -2,6 +2,7 @@
 
 ### Feat
 
+- **header**: read JinjaX's one-line form, defaults, and untyped names
 - **lsp**: resolve members through any Python language server
 - **nvim**: mirror stub diagnostics onto the template buffer
 - **lsp**: write stubs instead of running a checker
