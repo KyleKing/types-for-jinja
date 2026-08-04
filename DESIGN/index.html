@@ -1,0 +1,2123 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="types_for_jinja project documentation">
+      
+      
+        <meta name="author" content="Kyle King">
+      
+      
+        <link rel="canonical" href="https://types-for-jinja.kyleking.me/DESIGN/">
+      
+      
+        <link rel="prev" href="../BLUE_SKY/">
+      
+      
+        <link rel="next" href="../docs/CHANGELOG/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Design - types_for_jinja</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../_styles/mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#design" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="types_for_jinja" class="md-header__button md-logo" aria-label="types_for_jinja" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            types_for_jinja
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Design
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="green"  aria-hidden="true"  type="radio" name="__palette" id="__palette_0">
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/kyleking/types-for-jinja" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    kyleking/types-for-jinja
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="types_for_jinja" class="md-nav__button md-logo" aria-label="types_for_jinja" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    types_for_jinja
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/kyleking/types-for-jinja" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    kyleking/types-for-jinja
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    types-for-jinja
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../BLUE_SKY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Blue sky
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#origin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Origin
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#locked-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Locked decisions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Locked decisions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-a-stub-and-not-a-renderer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why a stub and not a renderer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-we-never-invoke-a-checker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why we never invoke a checker
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#three-independent-axes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Three independent axes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runtime-enforcement-is-a-separate-opt-in" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime enforcement is a separate opt-in
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Runtime enforcement is a separate opt-in">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#types-and-validators-are-independent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Types and validators are independent
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope boundary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backend-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backend evidence
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Backend evidence">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#all-three-checkers-read-the-stubs-identically" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        All three checkers read the stubs identically
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#line-alignment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Line alignment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#file-and-line-fidelity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File and line fidelity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-varies-between-backends" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What varies between backends
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#suppression" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Suppression
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#member-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Member resolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation-targets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation targets
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Validation targets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-yak-shears-spike-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the yak-shears spike found
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Docs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/CHANGELOG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CHANGELOG
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/DEVELOPER_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Notes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../docs/STYLE_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Personal Style Guides
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_1" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_1" id="__nav_5_1_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Types for jinja
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_1_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_1">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Types for jinja
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/types_for_jinja/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cli
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/types_for_jinja/complete/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Complete
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/types_for_jinja/components/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Components
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/types_for_jinja/config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/types_for_jinja/diagnostic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diagnostic
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/types_for_jinja/emit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Emit
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/types_for_jinja/filters/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Filters
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/types_for_jinja/generate/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Generate
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/types_for_jinja/header/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Header
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/types_for_jinja/layout/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Layout
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/types_for_jinja/lsp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Lsp
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/types_for_jinja/manifest/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manifest
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/types_for_jinja/members/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Members
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/types_for_jinja/remap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Remap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/types_for_jinja/resolve/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Resolve
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/types_for_jinja/suppress/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Suppress
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/types_for_jinja/transpile/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Transpile
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/types_for_jinja/wrapper/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Wrapper
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#origin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Origin
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#locked-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Locked decisions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Locked decisions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-a-stub-and-not-a-renderer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why a stub and not a renderer
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-we-never-invoke-a-checker" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why we never invoke a checker
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#three-independent-axes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Three independent axes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#runtime-enforcement-is-a-separate-opt-in" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime enforcement is a separate opt-in
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Runtime enforcement is a separate opt-in">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#types-and-validators-are-independent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Types and validators are independent
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope boundary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backend-evidence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backend evidence
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Backend evidence">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#all-three-checkers-read-the-stubs-identically" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        All three checkers read the stubs identically
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#line-alignment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Line alignment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#file-and-line-fidelity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File and line fidelity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-varies-between-backends" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What varies between backends
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#suppression" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Suppression
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#member-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Member resolution
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#validation-targets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Validation targets
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Validation targets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-yak-shears-spike-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the yak-shears spike found
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="design">Design<a class="headerlink" href="#design" title="Permanent link">⚓︎</a></h1>
+<p>Why types-for-jinja is shaped the way it is.
+Three kinds of thing live here:
+the decisions that are settled and should not be relitigated, the scope boundary
+and the reasoning behind each exclusion, and the measurements the design rests
+on so nobody has to take them again.</p>
+<p>Unscheduled work is in <a href="../BLUE_SKY/">BLUE_SKY.md</a>.
+Release history is in <a href="../docs/CHANGELOG/">docs/CHANGELOG.md</a>.</p>
+<h2 id="origin">Origin<a class="headerlink" href="#origin" title="Permanent link">⚓︎</a></h2>
+<p>Distilled from research into typed templating.
+Python has no equivalent of Go&rsquo;s templ, Scala&rsquo;s Twirl, or Rust&rsquo;s askama:
+a template whose context is checked against real host-language types before it
+runs.
+Three pieces of prior art shaped the design.</p>
+<p><strong>dbt TypeJinja</strong> (2025) is a static checker over dbt&rsquo;s Jinja IR that found 30
+real, previously-unknown type errors.
+It proves both the demand and the technique.
+It is also why dbt itself sits outside our scope, since that ecosystem is
+already served.</p>
+<p><strong>Twirl, templ, and askama</strong> compile a template into a typed host-language
+function wired into the build, a model all three have shipped for over ten
+years.
+We borrow the ergonomics (a typed callable) without becoming a renderer.</p>
+<p><strong>Coffin and Jingo</strong>, both dead Django-Jinja shims, are the anti-pattern.
+A dual-engine compatibility layer dies once the host framework absorbs the
+capability, so we do not build a shim.</p>
+<h2 id="locked-decisions">Locked decisions<a class="headerlink" href="#locked-decisions" title="Permanent link">⚓︎</a></h2>
+<table>
+<thead>
+<tr>
+<th>Decision</th>
+<th>Choice</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Execution model</td>
+<td>Write a stub, never run a checker</td>
+<td>Zero migration. Jinja renders unchanged, and Jinja&rsquo;s own compiler already is the renderer.</td>
+</tr>
+<tr>
+<td>Type inference</td>
+<td>Delegate to whichever checker the project runs</td>
+<td>We write no inference engine. Loop-variable narrowing, generics, and attribute checks come free.</td>
+</tr>
+<tr>
+<td>Language</td>
+<td>Python</td>
+<td>Native access to Jinja2&rsquo;s parser (<code>Environment.parse()</code>) and the user&rsquo;s own types. Trivial pip and pre-commit distribution.</td>
+</tr>
+<tr>
+<td>Declaration</td>
+<td>Comment header, <code>{#def ... #}</code></td>
+<td>Self-contained, one line per file, zero coupling, and Jinja parses it as a comment.</td>
+</tr>
+<tr>
+<td>Stub-to-stub imports</td>
+<td>Relative</td>
+<td>An absolute dotted name assumes where the checker puts its root, and breaks when the output directory moves.</td>
+</tr>
+<tr>
+<td>Suppression</td>
+<td>Blanket per line, spelled per checker</td>
+<td>Rule codes are not portable, and a name a checker does not know is itself an error.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="why-a-stub-and-not-a-renderer">Why a stub and not a renderer<a class="headerlink" href="#why-a-stub-and-not-a-renderer" title="Permanent link">⚓︎</a></h3>
+<p><strong>Jinja already ships its own template-to-Python compiler</strong>
+(<code>jinja2.compiler.CodeGenerator</code>).
+Jinja compiles every template to Python and runs it.
+That renderer exists and Pallets maintains it.
+Rebuilding a type-checked copy would mean permanent parity work on filters,
+escaping, inheritance, and the <code>foo.bar</code> then <code>foo['bar']</code> fallback.
+The stub route reports the same errors for a fraction of that code.</p>
+<p>The templ/Twirl ergonomic win is a typed function you call instead of a stringly
+<code>render('error.html', message=...)</code>.
+<code>types-for-jinja wrapper</code> captures that with a thin function that <strong>delegates</strong>
+to Jinja rather than replacing it.
+The responsibilities split cleanly:
+the wrapper types the boundary between your Python and the template, the stub
+types the inside of the template, and Jinja renders unchanged.</p>
+<h3 id="why-we-never-invoke-a-checker">Why we never invoke a checker<a class="headerlink" href="#why-we-never-invoke-a-checker" title="Permanent link">⚓︎</a></h3>
+<p>An earlier design ran pyright as a subprocess per file and owned its own <code>TJ###</code>
+diagnostic codes.
+Writing a stub instead is better on five counts, and the whole <code>check</code>
+subcommand was removed once the replacements existed.</p>
+<p>The stub is checked under the project&rsquo;s own settings.
+The subprocess wrote a fresh <code>pyrightconfig.json</code>, so the mypy pydantic plugin,
+custom stub paths, and strictness options never applied to template checks.
+Now they all do.</p>
+<p>There is no pyright-on-PATH requirement and no per-file process.
+The measured per-file floor was roughly 480 ms for pyright and 49 ms for ty
+regardless of template size.
+Over 25 stubs, one batched invocation beat 25 separate ones by 24x (pyright,
+12.02 s to 0.498 s) and 33x (ty, 1.22 s to 0.037 s), with identical diagnostics.
+Writing files gets that batching for free, and the user&rsquo;s checker keeps its
+incremental cache.</p>
+<p>Diagnostics carry the checker&rsquo;s native rule codes, so per-code suppression,
+baselines, and editor quick-fixes behave exactly as they do for the rest of the
+codebase.
+The portability problem that a private code catalog created disappears with the
+subprocess that made it necessary.</p>
+<p>CI, pre-commit, and the editor converge on one mechanism:
+fresh stubs, checked by whatever already checks the repo.</p>
+<p>Three things were lost, and each has a replacement.
+Template-native paths and columns in CI output come back through
+<code>types-for-jinja remap</code>.
+<code>--format json</code> and SARIF are replaced by the checker&rsquo;s own machine formats,
+remapped.
+<code>TJ###</code> codes are replaced by native codes, with <code>{# type: ignore #}</code> still
+working through the <code>suppression</code> setting.</p>
+<h2 id="three-independent-axes">Three independent axes<a class="headerlink" href="#three-independent-axes" title="Permanent link">⚓︎</a></h2>
+<p>Conflating these made the design look harder than it is.</p>
+<p><strong>Declaration syntax.</strong> Rung 1 is a comment (<code>{#def user: User #}</code>), which we
+control and which Jinja ignores.
+Rung 2 is an extension tag (<code>{% types user: User %}</code>), which we could ship but
+which couples a project to registering the extension.
+Rung 3 is first-class Jinja syntax, which belongs to Pallets.
+The Python parallel is exact:
+Python shipped <code># type:</code> comments first (PEP 484), and those comments proved the
+demand that justified native annotation syntax later (PEP 526).
+We cannot skip to rung 3 because Pallets moves on evidence generated at rungs 1
+and 2.
+Comments are the strategy rather than a phase to get past, and a good editor
+experience recovers most of what native syntax would add.</p>
+<p><strong>Execution model.</strong> Write a stub (chosen) or replace Jinja with generated code
+(rejected, see above).</p>
+<p><strong>Delivery.</strong> The CLI serves CI, and the language server plus the editor mirror
+serve the editor.
+Delivery does not change either of the other two axes.</p>
+<h2 id="runtime-enforcement-is-a-separate-opt-in">Runtime enforcement is a separate opt-in<a class="headerlink" href="#runtime-enforcement-is-a-separate-opt-in" title="Permanent link">⚓︎</a></h2>
+<p>One source of truth, the header, drives three levels.
+This mirrors how Python already works:
+the annotation is written once, a static checker reads it, and runtime
+enforcement is a separate opt-in.</p>
+<p>Level 0, static only, is the default and the reason people install the tool:
+zero runtime cost, template-internal errors caught.
+Level 1 adds the generated wrapper, still static only, moving the render call
+from stringly to typed.
+Level 2 decorates that wrapper with a real validator, which catches what static
+analysis cannot follow:
+database rows, API JSON, user input, dynamically assembled dicts.</p>
+<h3 id="types-and-validators-are-independent">Types and validators are independent<a class="headerlink" href="#types-and-validators-are-independent" title="Permanent link">⚓︎</a></h3>
+<p>The header names a type, and that type can be a dataclass, a <code>TypedDict</code>, a
+<code>Protocol</code>, a <code>NamedTuple</code>, or a Pydantic model.
+Checkers read Pydantic v2 model fields as ordinary annotated attributes, so
+attribute access is checked identically to a dataclass with no special-casing.</p>
+<p>Which validator enforces Level 2 is a separate choice:
+none (the default), beartype (checks the value against the annotation and
+raises, near-zero cost, non-transforming), or a Pydantic <code>TypeAdapter</code> (parses
+and coerces, heavier, best when the context comes from JSON or a database).</p>
+<p>The two axes never lock each other, because <code>pydantic.TypeAdapter</code> works on any
+type rather than only <code>BaseModel</code>.
+So <code>TypeAdapter(SomeDataclass).validate_python(ctx)</code> validates a dataclass
+context, and beartype composes even when the context types are Pydantic models.</p>
+<p>One honest semantic difference:
+beartype checks the value and leaves the object alone, while Pydantic parses and
+can hand the template a new coerced object.
+So the rendered object is not always the one you passed.</p>
+<p>The core stays Pydantic-agnostic and works against plain typing.
+beartype is the default Level 2 because it is lighter and non-transforming.
+Pydantic is the boundary-parsing upgrade for FastAPI-style apps.</p>
+<h2 id="scope-boundary">Scope boundary<a class="headerlink" href="#scope-boundary" title="Permanent link">⚓︎</a></h2>
+<p>The technique generalizes further than this implementation will.
+Transpiling a template to a throwaway host-language stub and running the host&rsquo;s
+type checker over it is engine-agnostic.
+We are choosing not to chase that, and this section records why so the question
+stays settled.</p>
+<p><strong>In scope</strong> is Jinja2 together with Jinja supersets and dialects, meaning
+anything Jinja&rsquo;s own parser reads:
+plain Jinja2, JinjaX, and the template sets in Flask, Litestar, FastAPI, Copier,
+and Cookiecutter projects.
+A superset that adds tags through a Jinja Extension belongs here.
+A loader that is not backed by files at all (<code>DictLoader</code>, a database) still
+needs the templates on disk to be checked.</p>
+<p><strong>Ansible, Salt, and dbt are out</strong> even though they parse as Jinja.
+Their contexts are untyped dicts assembled at runtime, so there is no declared
+type for a checker to check against, and all three lean on large custom filter
+libraries that collapse to <code>Any</code>.
+dbt already has TypeJinja, which works over dbt&rsquo;s own IR and understands <code>ref()</code>
+and <code>source()</code> in a way a generic Jinja checker cannot.
+Serving these would mean adopting three per-ecosystem filter catalogs plus a
+context-discovery story per host, none of which carries over to the templates we
+do serve.</p>
+<p><strong>Engines not hosted in Python are out</strong> for a harder reason.
+Everything downstream of the AST assumes Python:
+the stub is Python, a Python checker reads it, and the declared types are Python
+types.
+Nunjucks, Twig, Liquid, Handlebars, and Blade would each need their own emitter
+and their own type checker (<code>tsc</code>, PHPStan, Sorbet).
+That replaces the backend, which makes it a separate product rather than an
+adapter.
+templ and askama already solve this natively in Go and Rust.</p>
+<p><strong>Other Python engines are out</strong> for a semantic reason.
+Django&rsquo;s DTL resolves <code>{{ a.b }}</code> as dict key, then attribute, then list index,
+and calls zero-arg callables implicitly, so most dotted access would widen to
+<code>Any</code> and the checker would stop saying anything useful.
+Its <code>{% load %}</code> tags also carry signatures that live nowhere in the template.
+Mako embeds real Python already, which makes it an extraction problem of a
+different shape.
+Liquid is forgiving by design, where a missing variable rendering empty is
+correct behaviour, so strict diagnostics read as false positives against the
+language&rsquo;s own contract.</p>
+<p>If this ever reverses, the cost is known.
+<code>_emit_node</code> and <code>_expr</code> in <code>types_for_jinja/transpile.py</code> pattern-match
+<code>jinja2.nodes</code> directly, and <code>header.py</code> builds its patterns from the configured
+comment delimiters.
+A second Python-hosted engine would need an engine-neutral IR between the parser
+and the emitter, covering the dozen node kinds <code>_emit_node</code> already switches on.
+That is a few hundred lines.
+Do it when a second engine has a user asking for it.</p>
+<h2 id="backend-evidence">Backend evidence<a class="headerlink" href="#backend-evidence" title="Permanent link">⚓︎</a></h2>
+<p>Notes from 2026-07-29, revised 2026-08-04.
+Measured with pyright 1.1.411, ty 0.0.61, and mypy 2.3.0 on macOS.
+This is the evidence the design rests on, recorded so the measurements never
+have to be redone.</p>
+<h3 id="all-three-checkers-read-the-stubs-identically">All three checkers read the stubs identically<a class="headerlink" href="#all-three-checkers-read-the-stubs-identically" title="Permanent link">⚓︎</a></h3>
+<p>Checked against real generated stubs (dataclass context, bad attribute,
+undefined name, loop variable, filter call, bad method on <code>int</code>):
+pyright, ty, and mypy each reported the same errors on the same template lines.
+<code>tests/test_backends.py</code> holds that agreement on every run across eight
+invocations, and CI sets <code>TYPES_FOR_JINJA_REQUIRE_CHECKERS</code> so a missing backend
+fails rather than skips.</p>
+<p>Two defects had to be fixed first, and both were invisible under pyright alone.
+The stub reused one <code>_</code> name for every expression check, so mypy took its
+declared type from the first assignment and reported <code>Incompatible types in
+assignment</code> on every later one.
+The preamble now declares <code>_: _TJAny</code>.
+The generated filter signatures also had <code>...</code> bodies in a real module, which ty
+reports as <code>empty-body</code>, so they raise instead.
+Those two fixes took ty from 58 diagnostics to the 3 the examples are supposed
+to have, and mypy from 12 to the same 3.</p>
+<p>A third was invisible under any single configuration.
+The generated stub-to-stub imports used bare module names, which only resolved
+because ty and mypy infer the output directory as a source root when it has no
+<code>__init__.py</code>.
+Passing an explicit search path defeats that inference, so <code>ty check
+--extra-search-path . .</code> reported <code>unresolved-import</code> on every template using a
+filter or a cross-file macro.
+The imports are relative now, over a package marker at the output root, which
+resolves structurally in every invocation shape measured:
+from the project root, as a directory argument, as a single file, and with the
+output directory nested two levels down.
+The test that should have caught it was running the checkers from inside the
+stub tree with an explicit <code>extraPaths</code>, the one configuration that hid it.</p>
+<h3 id="line-alignment">Line alignment<a class="headerlink" href="#line-alignment" title="Permanent link">⚓︎</a></h3>
+<p>Measured over 126 templates (11 from <code>examples/</code>, 115 real ones from
+mkdocs-material):
+95.2% got an exact line-aligned stub, 2.4% kept <code># L</code> markers, and 2.4% raised
+<code>UnsupportedTemplateError</code>.
+Both remainders were addressed.
+A single-line <code>{% if %}...{% else %}...{% endif %}</code> collapses to a conditional
+expression, which narrows the same way the branches did, and
+<code>UnsupportedTemplateError</code> skips one template with a reason rather than ending
+the run.</p>
+<p>Five transformations took alignment from 30% to 95%, each traced to a measured
+failure:</p>
+<ul>
+<li>hoist <code>loop</code> to the preamble so a for-body&rsquo;s first line is free for real
+    statements</li>
+<li>drop the <code>_render</code> placeholder <code>pass</code>, which carried the header&rsquo;s line number
+    (73 of the original 78 fallbacks)</li>
+<li>route cross-file macro stubs to a sidecar module, since they carry another
+    template&rsquo;s line numbers</li>
+<li>demote <code>{% if x %}{% endif %}</code> to <code>_ = x</code>, a simple statement that can share a
+    physical line</li>
+<li>relocate <code>else:</code>, because Jinja records no line number for <code>{% else %}</code></li>
+</ul>
+<p>The preamble collapses onto the header&rsquo;s own line as <code>;</code>-joined simple
+statements, so alignment holds no matter how many imports and globals a project
+declares.
+Emitting at module level frees the indent level the template&rsquo;s top level needs,
+which means every declared name must be bound (<code>user: User = _tj_any</code>), not just
+annotated, or real errors disappear under <code>"user" is unbound</code>.
+Known gap:
+<code>loop</code> is bound at module level, so using <code>loop</code> outside a <code>{% for %}</code> is not
+flagged.</p>
+<p>The output directory must not start with a dot, because pyright excludes <code>**/.*</code>
+by default and reports a clean run over zero files.
+Every segment must also be a valid identifier, because the stubs import each
+other relatively.</p>
+<p>Stub paths mirror the template tree, with the filename always mangled (a module
+name cannot carry the template&rsquo;s extension) and directory names mangled only
+when they are not already identifiers.
+That last part is not cosmetic.
+Copier and Cookiecutter put Jinja expressions in directory names, and mypy
+refuses an entire run when it finds <code>{{ module_name }}/__init__.py</code>, reporting
+<code>contains __init__.py but is not a valid Python package name</code> and checking
+nothing at all.
+ty and pyright tolerated it, so the failure appeared on one backend only.
+Leading underscores are kept rather than stripped, so <code>_draft.jinja</code> and
+<code>draft.jinja</code> do not write the same stub.</p>
+<h3 id="file-and-line-fidelity">File and line fidelity<a class="headerlink" href="#file-and-line-fidelity" title="Permanent link">⚓︎</a></h3>
+<p>Lines are exact:
+the aligned layout makes generated line N template line N.
+What remains is the path and the column.</p>
+<p>The <strong>path</strong> names the stub.
+No Python checker honours a <code>//line</code>-style directive, so <code>remap</code> covers CI and
+the editor mirror covers editors.
+The upstream ask is in <a href="../BLUE_SKY/">BLUE_SKY.md</a>.
+Do not block on it.</p>
+<p>The <strong>column</strong> points into the stub line.
+Aligned stubs keep template expressions nearly verbatim, so <code>remap</code> and the
+mirror take the identifier the checker pointed at and find it again on the
+template line, keeping the stub column when the search misses.
+Measured across all eight backend invocations, the token at the recovered column
+is always the token the stub column pointed at.</p>
+<p>A <strong>sidecar</strong> module holds definitions another template contributed, so no line
+of it corresponds to a line here.
+The manifest records it against its template with a fixed line, which is the
+local <code>{% extends %}</code> or <code>{% include %}</code> tag, and every position in it reports
+there.</p>
+<p>The rare template with <strong>no aligned form</strong> keeps <code># L</code> markers, which <code>remap</code>
+reads from the stub file.</p>
+<h3 id="what-varies-between-backends">What varies between backends<a class="headerlink" href="#what-varies-between-backends" title="Permanent link">⚓︎</a></h3>
+<p>This table is <code>remap</code>&rsquo;s interface spec:
+everything a per-backend output parser needs.</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>ty</th>
+<th>pyright</th>
+<th>mypy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>import path</td>
+<td><code>--extra-search-path DIR</code></td>
+<td><code>extraPaths</code> in <code>pyrightconfig.json</code></td>
+<td><code>MYPYPATH</code> env</td>
+</tr>
+<tr>
+<td>machine output</td>
+<td><code>--output-format gitlab\|github\|junit</code> or <code>concise</code></td>
+<td><code>--outputjson</code></td>
+<td><code>--output json</code></td>
+</tr>
+<tr>
+<td>line base</td>
+<td>1</td>
+<td>0 in JSON, 1 in text</td>
+<td>1</td>
+</tr>
+<tr>
+<td>column base</td>
+<td>1</td>
+<td>0 in JSON, 1 in text</td>
+<td>0 in JSON, 1 in text</td>
+</tr>
+<tr>
+<td>undefined name</td>
+<td><code>unresolved-reference</code></td>
+<td><code>reportUndefinedVariable</code></td>
+<td><code>name-defined</code></td>
+</tr>
+<tr>
+<td>bad attribute</td>
+<td><code>unresolved-attribute</code></td>
+<td><code>reportAttributeAccessIssue</code></td>
+<td><code>attr-defined</code></td>
+</tr>
+<tr>
+<td>bad index</td>
+<td><code>invalid-argument-type</code></td>
+<td><code>reportArgumentType</code> / <code>reportCallIssue</code></td>
+<td><code>index</code> / <code>call-overload</code></td>
+</tr>
+<tr>
+<td>member detail</td>
+<td>in <code>detail</code></td>
+<td>only on <code>completionItem/resolve</code>, in <code>documentation</code></td>
+<td>n/a</td>
+</tr>
+</tbody>
+</table>
+<p>The member-detail row is why the language server declares <code>resolveSupport</code> and
+reads either field:
+without it, pyright&rsquo;s completion popup lists member names with no types beside
+them.</p>
+<h3 id="suppression">Suppression<a class="headerlink" href="#suppression" title="Permanent link">⚓︎</a></h3>
+<p>Rule codes are not portable across backends (the same error files under a
+different name per checker, and the mapping is one-to-many), which is why
+suppression drops codes rather than translating them.
+Measured behaviour of a bare ignore comment:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>pyright</th>
+<th>ty</th>
+<th>mypy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code># type: ignore</code></td>
+<td>suppresses</td>
+<td>suppresses</td>
+<td>suppresses</td>
+</tr>
+<tr>
+<td><code># ty: ignore</code></td>
+<td>no</td>
+<td>suppresses</td>
+<td>no</td>
+</tr>
+<tr>
+<td><code># pyright: ignore</code></td>
+<td>suppresses</td>
+<td>no</td>
+<td>no</td>
+</tr>
+<tr>
+<td><code># type: ignore[&lt;code&gt;]</code></td>
+<td>suppresses</td>
+<td>no</td>
+<td>suppresses</td>
+</tr>
+</tbody>
+</table>
+<p>So <code>{# type: ignore #}</code> (with or without a bracketed code) emits one blanket
+ignore on the aligned line, spelled per <code>[tool.types_for_jinja] suppression</code>:
+<code>portable</code> (the default, <code># type: ignore</code>), or <code>mypy</code>, <code>pyright</code>, <code>ty</code>.
+An unknown value is rejected at config load, because a silent fallback would
+emit comments the project&rsquo;s checker does not honour.
+Stacking (<code># type: ignore # ty: ignore</code>) was ruled out because ty reports
+<code>unused-ignore-comment</code> on the second directive.
+On an unaligned fallback line the ignore goes in front of the <code># L&lt;n&gt;</code> marker,
+since a checker only honours the directive when it opens the comment.</p>
+<h3 id="member-resolution">Member resolution<a class="headerlink" href="#member-resolution" title="Permanent link">⚓︎</a></h3>
+<p><code>ty server</code> answers member completions today.
+Measured against the fixture project it returns the same members as pyright with
+the same types, in 1-3 ms warm against pyright&rsquo;s 7-16 ms (cold start 32 ms
+against 525 ms).
+Both are reused across queries, so only the warm figure matters in an editor.</p>
+<h2 id="validation-targets">Validation targets<a class="headerlink" href="#validation-targets" title="Permanent link">⚓︎</a></h2>
+<ol>
+<li>Standalone examples in <code>examples/</code>:
+    <code>templates</code>, <code>crossfile</code>, <code>realworld</code>, and <code>runtime</code>.</li>
+<li>The yak-shears project, the real migration test.
+    Its templates carry <code>{#def #}</code> headers.</li>
+<li>A demo Flask app as a later, optional showcase.
+    Django only qualifies when it renders Jinja through <code>django-jinja</code>, because DTL
+    is out of scope.</li>
+</ol>
+<h3 id="what-the-yak-shears-spike-found">What the yak-shears spike found<a class="headerlink" href="#what-the-yak-shears-spike-found" title="Permanent link">⚓︎</a></h3>
+<p>Run against real templates using <code>{% extends %}</code>/<code>{% block %}</code> inheritance (26
+blocks, 7 extends), <code>{% if %}</code>/<code>{% for %}</code>/<code>{% set %}</code>, and filters (<code>length</code>,
+<code>tojson</code>, <code>title</code>, <code>sort</code>, <code>min</code>, <code>max</code>, <code>join</code>, <code>format</code>, <code>default</code>).</p>
+<p>What worked:
+on <code>error.html.jinja</code> (extends <code>base.html.jinja</code>, fills <code>{% block content %}</code>
+with <code>{{ message }}</code>), the transpiler extracted and checked the expressions
+inside the block.
+A correct header passes clean, and a <code>mesage</code> typo is caught at the right line.</p>
+<p>Two gaps it surfaced, both since closed.
+<strong>Jinja Environment globals</strong> (<code>static_url()</code>, <code>url_for()</code>,
+<code>get_flashed_messages()</code>) are injected into <code>Environment.globals</code> rather than
+passed per render, so a template calling one was flagged as an undefined
+variable.
+Globals are now declared once in <code>[tool.types_for_jinja]</code>.
+The second was <strong>inheritance context flow</strong>, because a child template&rsquo;s
+effective context spans the child and its base.
+Whole <code>{% extends %}</code> chains and <code>{% include %}</code> bodies now check against the
+including template&rsquo;s context.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["toc.autohide"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/tablesort/5.6.0/tablesort.min.js"></script>
+      
+        <script src="../_javascript/tables.js"></script>
+      
+    
+  </body>
+</html>

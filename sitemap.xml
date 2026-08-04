@@ -1,75 +1,99 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
-         <loc>https://typed-jinja.kyleking.me/</loc>
-         <lastmod>2026-08-01</lastmod>
+         <loc>https://types-for-jinja.kyleking.me/</loc>
+         <lastmod>2026-08-04</lastmod>
     </url>
     <url>
-         <loc>https://typed-jinja.kyleking.me/docs/CHANGELOG/</loc>
-         <lastmod>2026-08-01</lastmod>
+         <loc>https://types-for-jinja.kyleking.me/BLUE_SKY/</loc>
+         <lastmod>2026-08-04</lastmod>
     </url>
     <url>
-         <loc>https://typed-jinja.kyleking.me/docs/DEVELOPER_GUIDE/</loc>
-         <lastmod>2026-08-01</lastmod>
+         <loc>https://types-for-jinja.kyleking.me/DESIGN/</loc>
+         <lastmod>2026-08-04</lastmod>
     </url>
     <url>
-         <loc>https://typed-jinja.kyleking.me/docs/STYLE_GUIDE/</loc>
-         <lastmod>2026-08-01</lastmod>
+         <loc>https://types-for-jinja.kyleking.me/docs/CHANGELOG/</loc>
+         <lastmod>2026-08-04</lastmod>
     </url>
     <url>
-         <loc>https://typed-jinja.kyleking.me/reference/typed_jinja/check/</loc>
-         <lastmod>2026-08-01</lastmod>
+         <loc>https://types-for-jinja.kyleking.me/docs/DEVELOPER_GUIDE/</loc>
+         <lastmod>2026-08-04</lastmod>
     </url>
     <url>
-         <loc>https://typed-jinja.kyleking.me/reference/typed_jinja/cli/</loc>
-         <lastmod>2026-08-01</lastmod>
+         <loc>https://types-for-jinja.kyleking.me/docs/STYLE_GUIDE/</loc>
+         <lastmod>2026-08-04</lastmod>
     </url>
     <url>
-         <loc>https://typed-jinja.kyleking.me/reference/typed_jinja/codes/</loc>
-         <lastmod>2026-08-01</lastmod>
+         <loc>https://types-for-jinja.kyleking.me/reference/types_for_jinja/cli/</loc>
+         <lastmod>2026-08-04</lastmod>
     </url>
     <url>
-         <loc>https://typed-jinja.kyleking.me/reference/typed_jinja/config/</loc>
-         <lastmod>2026-08-01</lastmod>
+         <loc>https://types-for-jinja.kyleking.me/reference/types_for_jinja/complete/</loc>
+         <lastmod>2026-08-04</lastmod>
     </url>
     <url>
-         <loc>https://typed-jinja.kyleking.me/reference/typed_jinja/diagnostic/</loc>
-         <lastmod>2026-08-01</lastmod>
+         <loc>https://types-for-jinja.kyleking.me/reference/types_for_jinja/components/</loc>
+         <lastmod>2026-08-04</lastmod>
     </url>
     <url>
-         <loc>https://typed-jinja.kyleking.me/reference/typed_jinja/generate/</loc>
-         <lastmod>2026-08-01</lastmod>
+         <loc>https://types-for-jinja.kyleking.me/reference/types_for_jinja/config/</loc>
+         <lastmod>2026-08-04</lastmod>
     </url>
     <url>
-         <loc>https://typed-jinja.kyleking.me/reference/typed_jinja/header/</loc>
-         <lastmod>2026-08-01</lastmod>
+         <loc>https://types-for-jinja.kyleking.me/reference/types_for_jinja/diagnostic/</loc>
+         <lastmod>2026-08-04</lastmod>
     </url>
     <url>
-         <loc>https://typed-jinja.kyleking.me/reference/typed_jinja/layout/</loc>
-         <lastmod>2026-08-01</lastmod>
+         <loc>https://types-for-jinja.kyleking.me/reference/types_for_jinja/emit/</loc>
+         <lastmod>2026-08-04</lastmod>
     </url>
     <url>
-         <loc>https://typed-jinja.kyleking.me/reference/typed_jinja/lsp/</loc>
-         <lastmod>2026-08-01</lastmod>
+         <loc>https://types-for-jinja.kyleking.me/reference/types_for_jinja/filters/</loc>
+         <lastmod>2026-08-04</lastmod>
     </url>
     <url>
-         <loc>https://typed-jinja.kyleking.me/reference/typed_jinja/report/</loc>
-         <lastmod>2026-08-01</lastmod>
+         <loc>https://types-for-jinja.kyleking.me/reference/types_for_jinja/generate/</loc>
+         <lastmod>2026-08-04</lastmod>
     </url>
     <url>
-         <loc>https://typed-jinja.kyleking.me/reference/typed_jinja/resolve/</loc>
-         <lastmod>2026-08-01</lastmod>
+         <loc>https://types-for-jinja.kyleking.me/reference/types_for_jinja/header/</loc>
+         <lastmod>2026-08-04</lastmod>
     </url>
     <url>
-         <loc>https://typed-jinja.kyleking.me/reference/typed_jinja/suppress/</loc>
-         <lastmod>2026-08-01</lastmod>
+         <loc>https://types-for-jinja.kyleking.me/reference/types_for_jinja/layout/</loc>
+         <lastmod>2026-08-04</lastmod>
     </url>
     <url>
-         <loc>https://typed-jinja.kyleking.me/reference/typed_jinja/transpile/</loc>
-         <lastmod>2026-08-01</lastmod>
+         <loc>https://types-for-jinja.kyleking.me/reference/types_for_jinja/lsp/</loc>
+         <lastmod>2026-08-04</lastmod>
     </url>
     <url>
-         <loc>https://typed-jinja.kyleking.me/reference/typed_jinja/wrapper/</loc>
-         <lastmod>2026-08-01</lastmod>
+         <loc>https://types-for-jinja.kyleking.me/reference/types_for_jinja/manifest/</loc>
+         <lastmod>2026-08-04</lastmod>
+    </url>
+    <url>
+         <loc>https://types-for-jinja.kyleking.me/reference/types_for_jinja/members/</loc>
+         <lastmod>2026-08-04</lastmod>
+    </url>
+    <url>
+         <loc>https://types-for-jinja.kyleking.me/reference/types_for_jinja/remap/</loc>
+         <lastmod>2026-08-04</lastmod>
+    </url>
+    <url>
+         <loc>https://types-for-jinja.kyleking.me/reference/types_for_jinja/resolve/</loc>
+         <lastmod>2026-08-04</lastmod>
+    </url>
+    <url>
+         <loc>https://types-for-jinja.kyleking.me/reference/types_for_jinja/suppress/</loc>
+         <lastmod>2026-08-04</lastmod>
+    </url>
+    <url>
+         <loc>https://types-for-jinja.kyleking.me/reference/types_for_jinja/transpile/</loc>
+         <lastmod>2026-08-04</lastmod>
+    </url>
+    <url>
+         <loc>https://types-for-jinja.kyleking.me/reference/types_for_jinja/wrapper/</loc>
+         <lastmod>2026-08-04</lastmod>
     </url>
 </urlset>
