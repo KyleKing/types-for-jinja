@@ -7,6 +7,8 @@ from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
+from types_for_jinja.suppress import STYLES
+
 
 @dataclass(frozen=True)
 class WrapperConfig:
@@ -49,6 +51,7 @@ class Config:
 
     imports: list[str] = field(default_factory=list)
     globals: list[tuple[str, str]] = field(default_factory=list)
+    suppression: str = 'portable'
     template_dirs: list[str] = field(default_factory=list)
     wrapper: WrapperConfig = field(default_factory=WrapperConfig)
     syntax: Syntax = field(default_factory=Syntax)
@@ -66,10 +69,20 @@ def load_config(root: Path) -> Config:
     return Config(
         imports=list(table.get('imports', [])),
         globals=[(name, type_str) for name, type_str in declared.items()],
+        suppression=_suppression(table.get('suppression', 'portable')),
         template_dirs=list(table.get('template_dirs', [])),
         wrapper=WrapperConfig(**_known(WrapperConfig, table.get('wrapper', {}))),
         syntax=Syntax(**_known(Syntax, table.get('syntax', {}))),
     )
+
+
+def _suppression(value: str) -> str:
+    """Reject an unknown checker name loudly; a silent fallback would emit ignores nothing honours."""
+    if value not in STYLES:
+        known = ', '.join(sorted(STYLES))
+        msg = f'unknown suppression style {value!r}; expected one of {known}'
+        raise ValueError(msg)
+    return value
 
 
 def _known(cls: Any, table: dict[str, str]) -> dict[str, str]:

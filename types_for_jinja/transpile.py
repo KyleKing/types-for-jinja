@@ -97,8 +97,12 @@ def _ident(name: str) -> str:
     return f'_tj_kw_{name}' if keyword.iskeyword(name) else name
 
 
-class _UnsupportedError(Exception):
-    """A Jinja node this v1 transpiler does not model as a typed expression."""
+class UnsupportedTemplateError(Exception):
+    """A Jinja node this v1 transpiler does not model as a typed expression.
+
+    Callers that walk a set of templates must catch this and skip the one template, so a
+    single unsupported construct cannot take down a whole run.
+    """
 
 
 @dataclass
@@ -217,6 +221,7 @@ def _preamble(header: TemplateHeader, config: Config, extra_imports: list[str]) 
             Line(0, 'def _tj_any(*args: _TJAny, **kwargs: _TJAny) -> _TJAny: ...', header.lineno),
             Line(0, '_tj_loop: _TJAny', header.lineno),
             Line(0, '_tj_default: _TJAny = _tj_any()', header.lineno),
+            Line(0, '_: _TJAny', header.lineno),
         ]
     )
     lines.extend(
@@ -326,7 +331,7 @@ def _emit_assign(node: nodes.Assign, out: list[Line], indent: int) -> None:
     target = _target(node.target)
     try:
         value = _expr(node.node)
-    except _UnsupportedError:
+    except UnsupportedTemplateError:
         _emit_fallback_names(node.node, out, indent)
         value = 'None'
     out.append(Line(indent, f'{target} = {value}', node.lineno))
@@ -337,7 +342,7 @@ def _emit_with(node: nodes.With, out: list[Line], indent: int, ctx: _Emit) -> No
         name = _target(target)
         try:
             rendered = _expr(value)
-        except _UnsupportedError:
+        except UnsupportedTemplateError:
             _emit_fallback_names(value, out, indent)
             rendered = 'None'
         out.append(Line(indent, f'{name} = {rendered}', node.lineno))
@@ -528,7 +533,7 @@ def _emit_import(
 def _emit_expr_check(expr: nodes.Node, out: list[Line], indent: int) -> None:
     try:
         rendered = _expr(expr)
-    except _UnsupportedError:
+    except UnsupportedTemplateError:
         _emit_fallback_names(expr, out, indent)
         return
     out.append(Line(indent, f'_ = {rendered}', expr.lineno))
@@ -538,7 +543,7 @@ def _emit_fallback_names(node: nodes.Node, out: list[Line], indent: int) -> None
     for attr in node.find_all(nodes.Getattr):
         try:
             rendered = _expr(attr)
-        except _UnsupportedError:
+        except UnsupportedTemplateError:
             continue
         out.append(Line(indent, f'_ = {rendered}', attr.lineno))
     out.extend(
@@ -551,7 +556,7 @@ def _emit_fallback_names(node: nodes.Node, out: list[Line], indent: int) -> None
 def _cond(node: nodes.Node, out: list[Line], indent: int) -> str:
     try:
         return _expr(node)
-    except _UnsupportedError:
+    except UnsupportedTemplateError:
         _emit_fallback_names(node, out, indent)
         return 'True'
 
@@ -559,7 +564,7 @@ def _cond(node: nodes.Node, out: list[Line], indent: int) -> str:
 def _iter_expr(node: nodes.Node, out: list[Line], indent: int) -> str:
     try:
         return _expr(node)
-    except _UnsupportedError:
+    except UnsupportedTemplateError:
         _emit_fallback_names(node, out, indent)
         return '[]'
 
@@ -571,7 +576,7 @@ def _target(node: nodes.Node) -> str:
         case nodes.Tuple():
             return ', '.join(_target(item) for item in node.items)
         case _:
-            raise _UnsupportedError(type(node).__name__)
+            raise UnsupportedTemplateError(type(node).__name__)
 
 
 def _expr(node: nodes.Node) -> str:  # ruff:ignore[complex-structure, too-many-return-statements, too-many-branches]
@@ -586,7 +591,7 @@ def _expr(node: nodes.Node) -> str:  # ruff:ignore[complex-structure, too-many-r
             return f'{_expr(node.node)}[{_expr(node.arg)}]'
         case nodes.Filter() | nodes.Test():
             if node.node is None:
-                raise _UnsupportedError(type(node).__name__)
+                raise UnsupportedTemplateError(type(node).__name__)
             return _filtered(node)
         case nodes.Slice():
             return _slice(node)
@@ -612,7 +617,7 @@ def _expr(node: nodes.Node) -> str:  # ruff:ignore[complex-structure, too-many-r
             sep = ' ' if node.operator[-1].isalpha() else ''
             return f'({node.operator}{sep}{_expr(node.node)})'
         case _:
-            raise _UnsupportedError(type(node).__name__)
+            raise UnsupportedTemplateError(type(node).__name__)
 
 
 def _compare(node: nodes.Compare) -> str:
@@ -620,7 +625,7 @@ def _compare(node: nodes.Compare) -> str:
     for operand in node.ops:
         py_op = _CMP_OPS.get(operand.op)
         if py_op is None:
-            raise _UnsupportedError(operand.op)
+            raise UnsupportedTemplateError(operand.op)
         parts.append(f'{py_op} {_expr(operand.expr)}')
     return '(' + ' '.join(parts) + ')'
 
@@ -634,7 +639,7 @@ def _call(node: nodes.Call) -> str:
 def _filtered(node: nodes.Filter | nodes.Test) -> str:
     """Apply a filter or test as a call, using its declared signature when there is one."""
     if node.node is None:
-        raise _UnsupportedError(type(node).__name__)
+        raise UnsupportedTemplateError(type(node).__name__)
     args = [_expr(node.node)]
     args.extend(_expr(arg) for arg in node.args)
     args.extend(f'{kw.key}={_expr(kw.value)}' for kw in node.kwargs)

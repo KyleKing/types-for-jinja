@@ -14,6 +14,7 @@ Code catalog:
 - ``TJ006`` general type error
 - ``TJ010`` template syntax error
 - ``TJ011`` malformed ``{#def ... #}`` header
+- ``TJ012`` template uses a construct the transpiler does not model, template skipped
 """
 
 from __future__ import annotations
@@ -32,6 +33,7 @@ RULE_CODES: dict[str, str] = {
     'reportIndexIssue': 'TJ003',
     'reportUndefinedVariable': 'TJ001',
     'syntax-error': 'TJ010',
+    'unsupported': 'TJ012',
 }
 
 

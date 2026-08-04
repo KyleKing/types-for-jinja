@@ -17,7 +17,8 @@ from types_for_jinja.config import Config, load_config
 from types_for_jinja.emit import flat_name, mirrored_path, package_markers, stale_files, write_files
 from types_for_jinja.header import parse_header
 from types_for_jinja.layout import layout
-from types_for_jinja.transpile import transpile
+from types_for_jinja.suppress import annotate
+from types_for_jinja.transpile import UnsupportedTemplateError, transpile
 
 _SIDECAR_SUFFIX = '_tj_shared'
 
@@ -90,12 +91,16 @@ def _stub_for(template: Path, out_dir: Path, config: Config) -> Stub | str:
         module = transpile(source, header, config, template_path=template)
     except TemplateSyntaxError as err:
         return f'template syntax error: {err.message}'
+    except UnsupportedTemplateError as err:
+        return f'unsupported template construct: {err}'
     stub_path = mirrored_path(template, out_dir)
     shared = f'{flat_name(template)}{_SIDECAR_SUFFIX}'
     aligned = layout(module, header, shared)
     if aligned is None:
-        return Stub(template=template, files={stub_path: module.code}, aligned=False)
-    files = {stub_path: aligned.code, **package_markers(out_dir, stub_path)}
+        marked = annotate(module.code, source, config.suppression, aligned=False)
+        return Stub(template=template, files={stub_path: marked}, aligned=False)
+    code = annotate(aligned.code, source, config.suppression, aligned=True)
+    files = {stub_path: code, **package_markers(out_dir, stub_path)}
     if aligned.sidecar:
         files[out_dir / f'{shared}.py'] = aligned.sidecar
     return Stub(template=template, files=files, aligned=True)

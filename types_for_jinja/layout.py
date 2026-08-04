@@ -54,7 +54,9 @@ def _layout(module: GeneratedModule, header: TemplateHeader, sidecar_name: str) 
     rest = _unwrap_render(module.lines[module.preamble_len :])
     foreign = [line for line in rest if line.foreign]
     local = [line for line in rest if not line.foreign]
-    body = _fill_empty_suites(_demote_empty_blocks(_relocate_else(_drop_loop_bindings(local))))
+    body = _drop_loop_bindings(local)
+    for transform in (_collapse_inline_conditionals, _relocate_else, _demote_empty_blocks, _fill_empty_suites):
+        body = transform(body)
     _reject_unplaceable(body, header.lineno)
     buckets = _bucket(body)
     imports = [Line(0, f'from {sidecar_name} import *  # noqa: F403', header.lineno)] if foreign else []
@@ -132,6 +134,57 @@ def _is_scaffold(text: str) -> bool:
 
 def _bind(text: str) -> str:
     return f'{text} = _tj_any'
+
+
+def _collapse_inline_conditionals(body: list[Line]) -> list[Line]:
+    """Rewrite an ``if``/``else`` packed onto one template line as a conditional expression.
+
+    Python forbids two compound statements on one physical line, so
+    ``{% if a %}{{ x }}{% else %}{{ y }}{% endif %}`` has no aligned form as a statement.
+    ``_ = (x if a else y)`` checks both branches under the same narrowing and fits on the
+    single line the template used.
+    """
+    out = list(body)
+    changed = True
+    while changed:
+        changed = False
+        for index in range(len(out) - 1, -1, -1):
+            collapsed = _collapse_at(out, index)
+            if collapsed is not None:
+                out = collapsed
+                changed = True
+    return out
+
+
+def _collapse_at(body: list[Line], index: int) -> list[Line] | None:
+    group = body[index : index + 4]
+    if len(group) < 4:  # noqa: PLR2004
+        return None
+    head, then, alt, other = group
+    tail = body[index + 4] if index + 4 < len(body) else None
+    shaped = (
+        alt.text == 'else:'
+        and alt.indent == head.indent
+        and then.indent == head.indent + 1
+        and other.indent == head.indent + 1
+        and {line.lineno for line in group} == {head.lineno}
+        and (tail is None or tail.indent <= head.indent)
+    )
+    condition = _if_condition(head.text)
+    left, right = _checked_expression(then.text), _checked_expression(other.text)
+    if not (shaped and condition and left and right):
+        return None
+    collapsed = Line(head.indent, f'_ = ({left} if {condition} else {right})', head.lineno)
+    return [*body[:index], collapsed, *body[index + 4 :]]
+
+
+def _if_condition(text: str) -> str | None:
+    return text.removeprefix('if ').removesuffix(':') if text.startswith('if ') and text.endswith(':') else None
+
+
+def _checked_expression(text: str) -> str | None:
+    """The expression a bare ``_ = <expr>`` check evaluates, or ``None`` for anything else."""
+    return text.removeprefix('_ = ') if text.startswith('_ = ') and ';' not in text else None
 
 
 def _relocate_else(body: list[Line]) -> list[Line]:

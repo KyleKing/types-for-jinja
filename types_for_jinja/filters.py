@@ -139,7 +139,8 @@ from typing import TypeVar
 _T = TypeVar('_T')
 
 
-def _tj_test(value: _TJAny, /, *args: _TJAny, **kwargs: _TJAny) -> bool: ...
+def _tj_test(value: _TJAny, /, *args: _TJAny, **kwargs: _TJAny) -> bool:
+    raise NotImplementedError
 """
 
 
@@ -149,10 +150,16 @@ def stub_name(filter_name: str) -> str:
 
 
 def module_source() -> str:
-    """Render the importable module holding every filter signature."""
+    """Render the importable module holding every filter signature.
+
+    The bodies raise rather than being ``...`` because these are real modules, not stub
+    files, and a checker is entitled to report an implicit ``None`` return against the
+    declared type. Nothing ever calls them.
+    """
     lines = [_HEADER]
     lines.extend(
-        f'def {stub_name(name)}(value: {_value_type(returns)}, /, *args: _TJAny, **kwargs: _TJAny) -> {returns}: ...'
+        f'def {stub_name(name)}(value: {_value_type(returns)}, /, *args: _TJAny, **kwargs: _TJAny) -> {returns}:'
+        '\n    raise NotImplementedError'
         for name, returns in sorted(RETURNS.items())
     )
     return '\n\n'.join(lines) + '\n'

@@ -3,10 +3,13 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from types_for_jinja.codes import apply_codes
+from types_for_jinja.config import load_config
 from types_for_jinja.diagnostic import Diagnostic
 from types_for_jinja.report import format_json, format_sarif, format_text
-from types_for_jinja.suppress import apply_suppressions
+from types_for_jinja.suppress import STYLES, annotate, apply_suppressions
 
 
 def _diag(line, rule, code=''):
@@ -53,3 +56,51 @@ def test_reports_carry_the_code():
     assert '(TJ002 reportAttributeAccessIssue)' in format_text(diags)
     assert json.loads(format_json(diags))[0]['code'] == 'TJ002'
     assert json.loads(format_sarif(diags))['runs'][0]['results'][0]['ruleId'] == 'TJ002'
+
+
+_TEMPLATE = '{#def\nname: str\n#}\n{{ name.bad }}{# type: ignore #}\n{{ name.worse }}\n'
+
+
+def test_annotate_marks_the_aligned_line_only():
+    code = 'preamble\n\n\n_ = name.bad\n_ = name.worse\n'
+
+    annotated = annotate(code, _TEMPLATE, 'portable', aligned=True).splitlines()
+
+    assert annotated[3] == '_ = name.bad  # type: ignore'
+    assert annotated[4] == '_ = name.worse'
+
+
+def test_annotate_keeps_the_line_marker_last():
+    """`_template_line` reads the marker off the end, so the ignore goes in front of it."""
+    code = '    _ = name.bad  # L4\n    _ = name.worse  # L5\n'
+
+    annotated = annotate(code, _TEMPLATE, 'portable', aligned=False).splitlines()
+
+    assert annotated[0] == '    _ = name.bad  # type: ignore  # L4'
+    assert annotated[1] == '    _ = name.worse  # L5'
+
+
+def test_each_style_emits_its_own_checker_spelling():
+    code = 'preamble\n\n\n_ = name.bad\n'
+    emitted = {style: annotate(code, _TEMPLATE, style, aligned=True).splitlines()[3] for style in STYLES}
+
+    assert emitted['portable'].endswith('# type: ignore')
+    assert emitted['pyright'].endswith('# pyright: ignore')
+    assert emitted['ty'].endswith('# ty: ignore')
+
+
+def test_annotate_leaves_a_template_without_ignores_untouched():
+    code = '_ = name.bad\n'
+
+    assert annotate(code, '{{ name.bad }}\n', 'portable', aligned=True) == code
+
+
+def test_unknown_suppression_style_is_rejected(tmp_path):
+    """Falling back silently would emit ignore comments the project's checker never honours."""
+    (tmp_path / 'pyproject.toml').write_text(
+        '[tool.types_for_jinja]\nsuppression = "pyrite"\n',
+        encoding='utf-8',
+    )
+
+    with pytest.raises(ValueError, match='unknown suppression style'):
+        load_config(tmp_path)

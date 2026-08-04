@@ -17,7 +17,7 @@ from types_for_jinja.config import Config, load_config
 from types_for_jinja.diagnostic import Diagnostic
 from types_for_jinja.header import header_errors, parse_header
 from types_for_jinja.suppress import apply_suppressions
-from types_for_jinja.transpile import transpile
+from types_for_jinja.transpile import UnsupportedTemplateError, transpile
 
 _MARKER_RE = re.compile(r'#\s*L(\d+)\s*$')
 CACHE_DIR = Path('.types_for_jinja_cache')
@@ -58,6 +58,9 @@ def _raw_diagnostics(source: str, path: Path, cache_dir: Path, config: Config | 
         module = transpile(source, header, resolved, template_path=path)
     except TemplateSyntaxError as err:
         return [Diagnostic(path, err.lineno or 1, 1, 'error', f'template syntax error: {err.message}', 'syntax-error')]
+    except UnsupportedTemplateError as err:
+        message = f'unsupported template construct: {err}; skipped'
+        return [Diagnostic(path, header.lineno, 1, 'warning', message, 'unsupported')]
     prepare_cache(cache_dir)
     generated = cache_dir / f'{_safe_name(path)}.py'
     generated.write_text(module.code, encoding='utf-8')
