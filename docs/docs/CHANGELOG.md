@@ -2,6 +2,7 @@
 
 ### Feat
 
+- **lsp**: write stubs instead of running a checker
 - **cli**: add remap to name templates in checker output
 - **generate**: record each stub's template in a manifest
 - **generate**: make the stubs check clean under ty, mypy, and pyright

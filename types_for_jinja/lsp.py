@@ -29,7 +29,9 @@ from types_for_jinja.config import Config, load_config
 from types_for_jinja.diagnostic import Diagnostic
 from types_for_jinja.generate import diagnose, generate, write
 from types_for_jinja.header import parse_header
+from types_for_jinja.manifest import stub_path_for
 from types_for_jinja.members import MemberResolver
+from types_for_jinja.remap import Remapper
 
 SERVER = LanguageServer('types-for-jinja-lsp', '0.0.1')
 
@@ -318,6 +320,66 @@ def hover(server: LanguageServer, params: t.HoverParams) -> t.Hover | None:
     if text is None:
         return None
     return t.Hover(contents=t.MarkupContent(kind=t.MarkupKind.Markdown, value=f'```python\n{text}\n```'))
+
+
+STUB_FOR = 'types-for-jinja/stubFor'
+REMAP = 'types-for-jinja/remap'
+
+
+def _field(params: object, key: str) -> object:
+    """Read one field from custom-request params.
+
+    pygls has no schema for a method it does not know, so it hands over an attribute object
+    rather than a mapping. Reading both shapes keeps these handlers callable from a test.
+    """
+    if isinstance(params, dict):
+        return params.get(key)
+    return getattr(params, key, None)
+
+
+def _index(params: object, key: str) -> int:
+    """A zero-based LSP line or character, floored at zero."""
+    value = _field(params, key)
+    return max(value, 0) if isinstance(value, int) else 0
+
+
+@SERVER.feature(STUB_FOR)
+def stub_for(_server: LanguageServer, params: object) -> dict[str, str | None]:
+    """Answer which stub a template generates, so a client can load it and watch its diagnostics.
+
+    One language server cannot see another's diagnostics, so mirroring has to happen in the
+    editor. This is the half of it that needs the manifest.
+    """
+    template = _field(params, 'template')
+    if not isinstance(template, str):
+        return {'stub': None}
+    found = stub_path_for(Path(template), Path(load_config(Path.cwd()).out_dir))
+    return {'stub': None if found is None else str(found)}
+
+
+@SERVER.feature(REMAP)
+def remap_positions(_server: LanguageServer, params: object) -> dict[str, object]:
+    """Turn stub positions into template positions, in the zero-based form LSP uses.
+
+    The client sends the positions a checker reported in a stub and gets back where they
+    belong in the template. Keeping the arithmetic here means the editor mirror and
+    ``types-for-jinja remap`` cannot drift apart.
+    """
+    stub = _field(params, 'stub')
+    raw = _field(params, 'positions')
+    if not isinstance(stub, str) or not isinstance(raw, list):
+        return {'template': None, 'positions': []}
+    remapper = Remapper(Path(load_config(Path.cwd()).out_dir))
+    located = [remapper.locate(stub, _index(entry, 'line') + 1, _index(entry, 'character') + 1) for entry in raw]
+    resolved = next((entry for entry in located if entry is not None), None)
+    if resolved is None:
+        return {'template': None, 'positions': []}
+    return {
+        'template': str(resolved.path),
+        'positions': [
+            None if entry is None else {'line': entry.line - 1, 'character': entry.column - 1} for entry in located
+        ],
+    }
 
 
 @SERVER.feature(t.SHUTDOWN)

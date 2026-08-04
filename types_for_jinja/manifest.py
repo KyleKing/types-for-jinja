@@ -59,6 +59,10 @@ class Manifest:
         entry = self.entries.get(stub)
         return entry is not None and entry.aligned
 
+    def stub_for(self, template: PurePosixPath) -> PurePosixPath | None:
+        """The stub a template generates, or ``None`` if it generates none."""
+        return next((stub for stub, entry in self.entries.items() if entry.template == template), None)
+
 
 def relative(path: Path, base: Path) -> PurePosixPath:
     """Express ``path`` under ``base`` as a portable relative path."""
@@ -126,6 +130,12 @@ def merge(previous: Manifest, current: Manifest, decided: set[PurePosixPath]) ->
         if entry.template not in decided and Path(entry.template).is_file()
     }
     return Manifest(entries={**kept, **current.entries})
+
+
+def stub_path_for(template: Path, out_dir: Path) -> Path | None:
+    """Where ``template``'s stub lives on disk, or ``None`` when the manifest has no entry."""
+    found = load(out_dir).stub_for(relative(template, Path.cwd()))
+    return None if found is None else out_dir / found
 
 
 def orphans(previous: Manifest, merged: Manifest, out_dir: Path) -> list[Path]:

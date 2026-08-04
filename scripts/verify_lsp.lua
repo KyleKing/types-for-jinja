@@ -17,6 +17,7 @@
 
 local root = vim.fn.getcwd()
 local exe = os.getenv('TJ_LSP') or 'types-for-jinja-lsp'
+local repo = os.getenv('TJ_REPO') or '.'
 
 vim.filetype.add({
   extension = { jinja = 'jinja' },
@@ -29,6 +30,19 @@ vim.lsp.config('types_for_jinja', {
   root_markers = { 'pyproject.toml', '.git' },
 })
 vim.lsp.enable('types_for_jinja')
+
+-- A real Python language server, standing in for whatever the project already runs. It is
+-- what actually type-checks the generated stubs; the mirror only moves what it reports.
+vim.lsp.config('pyright', {
+  cmd = { 'pyright-langserver', '--stdio' },
+  filetypes = { 'python' },
+  root_markers = { 'pyproject.toml', '.git' },
+  settings = { python = { analysis = { extraPaths = { root } } } },
+})
+vim.lsp.enable('pyright')
+
+vim.opt.runtimepath:append(repo .. '/editors/nvim')
+require('types_for_jinja.mirror').setup()
 
 local function open(path)
   vim.cmd('edit! ' .. vim.fn.fnameescape(path))
@@ -128,6 +142,32 @@ vim.api.nvim_buf_set_lines(page, 7, 8, false, { '  <li>{{ item |' })
 local filters = labels(request(page, 'textDocument/completion', position(page, 8, 15)))
 io.write(string.format('phase7 (filters) length=%s\n', tostring(filters['length'])))
 
+-- Phase 8: the mirror puts the Python server's stub diagnostics on the template.
+-- Earlier phases scribbled on the buffer, so restore the fixture's own three errors first.
+vim.api.nvim_buf_set_lines(page, 4, 5, false, { '<h1>Hello {{ user.naem }}</h1>' })
+vim.api.nvim_buf_set_lines(page, 7, 8, false, { '  <li>{{ item.titel }} by {{ author }}</li>' })
+vim.cmd('silent write')
+local mirrored = {}
+local appeared = vim.wait(40000, function()
+  mirrored = vim.diagnostic.get(page, { namespace = vim.api.nvim_create_namespace('types_for_jinja_mirror') })
+  return #mirrored >= 3
+end, 500)
+io.write(string.format('phase8 (mirrored) appeared=%s count=%d\n', tostring(appeared), #mirrored))
+table.sort(mirrored, function(a, b)
+  if a.lnum ~= b.lnum then return a.lnum < b.lnum end
+  return a.col < b.col
+end)
+for _, d in ipairs(mirrored) do
+  local text = vim.api.nvim_buf_get_lines(page, d.lnum, d.lnum + 1, false)[1] or ''
+  io.write(string.format('  L%d C%d %s | on: %s\n', d.lnum + 1, d.col + 1, d.message:gsub('\n', ' '), text))
+end
+
+--- The mirrored column must land on the identifier the message is about.
+local function points_at(d, word)
+  local text = vim.api.nvim_buf_get_lines(page, d.lnum, d.lnum + 1, false)[1] or ''
+  return text:sub(d.col + 1, d.col + #word) == word
+end
+
 local phase1_ok = #bare_diags == 1 and bare_diags[1].message:find('{#def', 1, true) ~= nil
 local phase2_ok = wrote and stub_text ~= nil
 local phase3_ok = edited and edited_text:find('naem', 1, true) == nil
@@ -136,11 +176,19 @@ local phase5_ok = hover_value:find('user: User', 1, true) ~= nil
 local phase6_ok = #member_names == 2 and member_names[1] == 'done' and member_names[2] == 'title'
 local phase7_ok = filters['length'] ~= nil and filters['length']:find('int', 1, true) ~= nil
 
-io.write(string.format('phases ok: 1=%s 2=%s 3=%s 4=%s 5=%s 6=%s 7=%s\n',
-  tostring(phase1_ok), tostring(phase2_ok), tostring(phase3_ok), tostring(phase4_ok),
-  tostring(phase5_ok), tostring(phase6_ok), tostring(phase7_ok)))
+local on_line_5 = vim.tbl_filter(function(d) return d.lnum == 4 end, mirrored)
+local on_line_8 = vim.tbl_filter(function(d) return d.lnum == 7 end, mirrored)
+local phase8_ok = appeared
+  and #on_line_5 == 1 and points_at(on_line_5[1], 'naem')
+  and #on_line_8 == 2
+  and points_at(on_line_8[1], 'titel') and points_at(on_line_8[2], 'author')
 
-if phase1_ok and phase2_ok and phase3_ok and phase4_ok and phase5_ok and phase6_ok and phase7_ok then
+io.write(string.format('phases ok: 1=%s 2=%s 3=%s 4=%s 5=%s 6=%s 7=%s 8=%s\n',
+  tostring(phase1_ok), tostring(phase2_ok), tostring(phase3_ok), tostring(phase4_ok),
+  tostring(phase5_ok), tostring(phase6_ok), tostring(phase7_ok), tostring(phase8_ok)))
+
+if phase1_ok and phase2_ok and phase3_ok and phase4_ok
+  and phase5_ok and phase6_ok and phase7_ok and phase8_ok then
   vim.cmd('qall!')
 else
   vim.cmd('cquit 1')

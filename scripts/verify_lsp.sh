@@ -14,6 +14,7 @@ uv run --project "$repo" python "$repo/scripts/fixture_project.py" "$project"
 
 venv_lsp="$repo/.venv/bin/types-for-jinja-lsp"
 if [ -x "$venv_lsp" ]; then export TJ_LSP="$venv_lsp"; fi
+export TJ_REPO="$repo"
 
 cd "$project"
 nvim --headless --clean -l "$repo/scripts/verify_lsp.lua"

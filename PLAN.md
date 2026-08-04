@@ -105,7 +105,6 @@ Decided after the backend evidence (below) proved pyright, ty, and mypy read the
 
 Ordered so each step lands independently. `check` is deleted last, after its replacements exist.
 
-1. **Editor mirroring.** A thin client-side layer republishes stub diagnostics onto the template buffer, line for line: an autocmd on `DiagnosticChanged` for the stubs tree in `editors/nvim`, and a small VS Code extension doing the same through `languages.onDidChangeDiagnostics`. Mirroring must live client-side because one LSP server cannot observe another server's diagnostics. Until it lands, errors appear in the stub with the right line, one click from the template.
 1. **Attribute completion backend.** `MemberResolver` hardcodes `pyright-langserver`. Generalize discovery to any LSP-speaking checker (`ty server` once its completions stabilize) and return no member items when none is found; completion is additive, so absence stays quiet.
 1. **Delete `check`.** Remove `check.py`, `codes.py`, `report.py`, and the `.types_for_jinja_cache` layout. Rewrite the pyright-gated tests (seven files gate on `shutil.which('pyright')`, and `tests/test_v11_crossfile.py`, `tests/test_v11_macro.py`, and `tests/test_v1_realworld.py` assert on literal pyright rule names) against generated stubs and `tests/test_backends.py`. The `suppression` machinery stays; `generate` is its consumer.
 1. **Docs.** README rewritten and BACKENDS.md merged into "Backend evidence" below (both done pre-emptively), CHANGELOG entry, and docs/BLUE_SKY.md holding the unscheduled items.

@@ -8,13 +8,14 @@ diagnostics the server does publish are the four it can determine on its own.
 
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from lsprotocol import types as t
 from pygls.lsp.server import LanguageServer
 
 from types_for_jinja.config import Config
-from types_for_jinja.lsp import _publish, _publish_debounced, did_close, sync_stub
+from types_for_jinja.lsp import _publish, _publish_debounced, did_close, remap_positions, stub_for, sync_stub
 
 from . import backends
 from .backends import STUB_DIR, TEMPLATE_PATH
@@ -32,6 +33,11 @@ def project(tmp_path, monkeypatch):
 @pytest.fixture
 def config():
     return Config(out_dir=STUB_DIR)
+
+
+def _dummy() -> LanguageServer:
+    """The custom handlers ignore the server argument, but its type is still enforced."""
+    return LanguageServer('test', '0')
 
 
 def _server(monkeypatch):
@@ -130,6 +136,44 @@ def test_closing_a_template_restores_the_saved_stub(project, monkeypatch):
     did_close(server, t.DidCloseTextDocumentParams(text_document=t.TextDocumentIdentifier(uri=uri)))
 
     assert '_ = user.naem' in (project / _STUB).read_text(encoding='utf-8')
+
+
+def test_stub_for_names_the_stub_a_template_generates(project, config):
+    """The editor mirror needs this to know which buffer to watch."""
+    sync_stub((project / TEMPLATE_PATH).read_text(encoding='utf-8'), Path(TEMPLATE_PATH), config)
+
+    answer = stub_for(_dummy(), {'template': str(project / TEMPLATE_PATH)})
+
+    assert answer == {'stub': str(_STUB)}
+
+
+def test_stub_for_is_quiet_about_a_template_with_no_stub(project, config):
+    assert stub_for(_dummy(), {'template': str(project / 'templates/bare.html.jinja')}) == {'stub': None}
+    assert stub_for(_dummy(), {'nonsense': 1}) == {'stub': None}
+
+
+def test_remap_turns_stub_positions_into_template_positions(project, config):
+    """Same arithmetic as the CLI, so the mirror and `types-for-jinja remap` cannot disagree."""
+    sync_stub((project / TEMPLATE_PATH).read_text(encoding='utf-8'), Path(TEMPLATE_PATH), config)
+
+    answer = remap_positions(_dummy(), {'stub': str(_STUB), 'positions': [{'line': 4, 'character': 4}]})
+
+    assert answer['template'] == TEMPLATE_PATH
+    assert answer['positions'] == [{'line': 4, 'character': 13}]
+
+
+def test_remap_reports_nothing_for_a_path_it_does_not_own(project, config):
+    answer = remap_positions(_dummy(), {'stub': 'app/broken.py', 'positions': [{'line': 1, 'character': 0}]})
+
+    assert answer == {'template': None, 'positions': []}
+
+
+def test_the_custom_requests_read_an_attribute_object(project, config):
+    """Pygls has no schema for a custom method, so it hands over attributes rather than a mapping."""
+    sync_stub((project / TEMPLATE_PATH).read_text(encoding='utf-8'), Path(TEMPLATE_PATH), config)
+    params = SimpleNamespace(template=str(project / TEMPLATE_PATH))
+
+    assert stub_for(_dummy(), params) == {'stub': str(_STUB)}
 
 
 def test_rapid_edits_collapse_into_one_sync(monkeypatch):
