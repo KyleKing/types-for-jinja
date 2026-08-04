@@ -1,11 +1,12 @@
 """Tests for the types-for-jinja language server (in-process, no subprocess)."""
 
+import time
 from pathlib import Path
 
 from lsprotocol import types as t
 from pygls.lsp.server import LanguageServer
 
-from types_for_jinja.lsp import _publish, compute_diagnostics, compute_diagnostics_source
+from types_for_jinja.lsp import _publish, _publish_debounced, compute_diagnostics, compute_diagnostics_source
 
 from .configuration import requires_pyright
 
@@ -44,6 +45,19 @@ def test_compute_diagnostics_source_reflects_the_buffer_not_disk():
     diagnostics = compute_diagnostics_source(edited, _OK)
 
     assert any('nmae' in d.message for d in diagnostics)
+
+
+def test_rapid_edits_collapse_into_one_check(monkeypatch):
+    """Every keystroke sends a change; only the last one should reach pyright."""
+    checks: list[str] = []
+    monkeypatch.setattr('types_for_jinja.lsp._publish', lambda _server, uri: checks.append(uri))
+    uri = _OK.resolve().as_uri()
+
+    for _ in range(10):
+        _publish_debounced(LanguageServer('test', '0'), uri, delay=0.05)
+    time.sleep(0.3)
+
+    assert checks == [uri]
 
 
 def test_publish_checks_the_live_buffer_over_a_clean_file(monkeypatch):

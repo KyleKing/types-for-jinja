@@ -3,6 +3,14 @@
 -- Install: copy this file to ~/.config/nvim/lsp/types_for_jinja.lua, then in your config:
 --   vim.lsp.enable('types_for_jinja')
 --
+-- Completion is off until you enable it per buffer. See editors/nvim/README.md:
+--   vim.o.completeopt = 'menu,menuone,popup'
+--   vim.api.nvim_create_autocmd('LspAttach', {
+--     callback = function(args)
+--       vim.lsp.completion.enable(true, args.data.client_id, args.buf, { autotrigger = true })
+--     end,
+--   })
+--
 -- Filetype detection for templates (add once to your config):
 --   vim.filetype.add({
 --     extension = { jinja = 'jinja' },

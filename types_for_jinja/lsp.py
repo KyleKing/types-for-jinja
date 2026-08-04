@@ -4,10 +4,14 @@ On open, change, and save of a template, it runs the checker and publishes the
 results as LSP diagnostics. It checks the live buffer text while a document is
 open, so unsaved edits are reflected, and falls back to the file on disk when no
 buffer is tracked.
+
+It also completes and describes the names the typed context makes available at the
+cursor, which is what the ``{#def ... #}`` header is for.
 """
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 
 from lsprotocol import types as t
@@ -15,8 +19,17 @@ from pygls.lsp.server import LanguageServer
 from pygls.uris import to_fs_path
 
 from types_for_jinja.check import Diagnostic, PyrightNotFoundError, check_file, check_source
+from types_for_jinja.complete import ContextName, context_names, cursor_context, describe, word_at
+from types_for_jinja.config import load_config
+from types_for_jinja.header import parse_header
 
 SERVER = LanguageServer('types-for-jinja-lsp', '0.0.1')
+
+DEBOUNCE_SECONDS = 0.3
+"""How long a buffer must be idle before an edit triggers a re-check."""
+
+_PENDING: dict[str, threading.Timer] = {}
+_PENDING_LOCK = threading.Lock()
 
 
 def _to_lsp(diagnostic: Diagnostic) -> t.Diagnostic:
@@ -52,6 +65,61 @@ def compute_diagnostics_source(source: str, path: Path) -> list[t.Diagnostic]:
     return [_to_lsp(diagnostic) for diagnostic in diagnostics]
 
 
+_ORIGIN_KINDS = {
+    'global': t.CompletionItemKind.Variable,
+    'imported macro': t.CompletionItemKind.Function,
+    'imported macros': t.CompletionItemKind.Module,
+    'loop helper': t.CompletionItemKind.Variable,
+    'loop target': t.CompletionItemKind.Variable,
+    'macro': t.CompletionItemKind.Function,
+    'macro parameter': t.CompletionItemKind.Variable,
+    'parameter': t.CompletionItemKind.Field,
+    'set': t.CompletionItemKind.Variable,
+    'with target': t.CompletionItemKind.Variable,
+}
+
+
+def visible_names(source: str, line: int) -> list[ContextName]:
+    """Return the context names visible on one-based ``line`` of ``source``."""
+    header = parse_header(source)
+    if header is None:
+        return []
+    return context_names(source, header, load_config(Path.cwd()), line=line)
+
+
+def complete(source: str, line: int, column: int) -> list[t.CompletionItem]:
+    """Complete context names at zero-based ``line`` and ``column``.
+
+    Attribute access (anything after a ``.``) is left to the checker for now, so an
+    empty list there means "no suggestion", not "no such attribute".
+    """
+    lines = source.splitlines()
+    if line >= len(lines):
+        return []
+    context = cursor_context(lines[line], column)
+    if not context.in_expression or context.attribute_of:
+        return []
+    return [
+        t.CompletionItem(
+            label=entry.name,
+            kind=_ORIGIN_KINDS.get(entry.origin, t.CompletionItemKind.Variable),
+            detail=describe(entry),
+        )
+        for entry in visible_names(source, line + 1)
+    ]
+
+
+def hover_text(source: str, line: int, column: int) -> str | None:
+    """Describe the context name under zero-based ``line`` and ``column``, if there is one."""
+    lines = source.splitlines()
+    if line >= len(lines):
+        return None
+    word = word_at(lines[line], column)
+    if not word:
+        return None
+    return next((describe(entry) for entry in visible_names(source, line + 1) if entry.name == word), None)
+
+
 def _live_source(server: LanguageServer, uri: str) -> str | None:
     try:
         return server.workspace.get_text_document(uri).source
@@ -69,6 +137,22 @@ def _publish(server: LanguageServer, uri: str) -> None:
     server.text_document_publish_diagnostics(t.PublishDiagnosticsParams(uri=uri, diagnostics=diagnostics))
 
 
+def _publish_debounced(server: LanguageServer, uri: str, delay: float = DEBOUNCE_SECONDS) -> None:
+    """Check ``uri`` once the buffer has been quiet for ``delay``, replacing any pending check.
+
+    Each check spawns pyright, which is far slower than a keystroke, so checking on every
+    change would queue work faster than it drains and stall completion and hover behind it.
+    """
+    with _PENDING_LOCK:
+        pending = _PENDING.pop(uri, None)
+        if pending is not None:
+            pending.cancel()
+        timer = threading.Timer(delay, _publish, args=(server, uri))
+        timer.daemon = True
+        _PENDING[uri] = timer
+        timer.start()
+
+
 @SERVER.feature(t.TEXT_DOCUMENT_DID_OPEN)
 def did_open(server: LanguageServer, params: t.DidOpenTextDocumentParams) -> None:
     """Check a template when it is opened."""
@@ -77,14 +161,44 @@ def did_open(server: LanguageServer, params: t.DidOpenTextDocumentParams) -> Non
 
 @SERVER.feature(t.TEXT_DOCUMENT_DID_CHANGE)
 def did_change(server: LanguageServer, params: t.DidChangeTextDocumentParams) -> None:
-    """Re-check a template as its buffer changes, before it is saved."""
-    _publish(server, params.text_document.uri)
+    """Re-check a template once its buffer settles, before it is saved."""
+    _publish_debounced(server, params.text_document.uri)
 
 
 @SERVER.feature(t.TEXT_DOCUMENT_DID_SAVE)
 def did_save(server: LanguageServer, params: t.DidSaveTextDocumentParams) -> None:
     """Re-check a template when it is saved."""
     _publish(server, params.text_document.uri)
+
+
+def _document_source(server: LanguageServer, uri: str) -> str | None:
+    source = _live_source(server, uri)
+    if source is not None:
+        return source
+    fs_path = to_fs_path(uri)
+    return Path(fs_path).read_text(encoding='utf-8') if fs_path else None
+
+
+@SERVER.feature(t.TEXT_DOCUMENT_COMPLETION, t.CompletionOptions(trigger_characters=[' ', '.']))
+def completion(server: LanguageServer, params: t.CompletionParams) -> t.CompletionList:
+    """Offer the context names visible at the cursor."""
+    source = _document_source(server, params.text_document.uri)
+    if source is None:
+        return t.CompletionList(is_incomplete=False, items=[])
+    items = complete(source, params.position.line, params.position.character)
+    return t.CompletionList(is_incomplete=False, items=items)
+
+
+@SERVER.feature(t.TEXT_DOCUMENT_HOVER)
+def hover(server: LanguageServer, params: t.HoverParams) -> t.Hover | None:
+    """Describe the declared type of the context name under the cursor."""
+    source = _document_source(server, params.text_document.uri)
+    if source is None:
+        return None
+    text = hover_text(source, params.position.line, params.position.character)
+    if text is None:
+        return None
+    return t.Hover(contents=t.MarkupContent(kind=t.MarkupKind.Markdown, value=f'```python\n{text}\n```'))
 
 
 def main() -> None:
