@@ -16,6 +16,7 @@ from typing import Literal
 from types_for_jinja.config import Config, WrapperConfig, load_config
 from types_for_jinja.emit import mirrored_path, package_markers
 from types_for_jinja.header import TemplateHeader, header_errors, parse_header
+from types_for_jinja.resolve import search_paths
 
 Validator = Literal['none', 'beartype', 'pydantic']
 VALIDATORS: tuple[Validator, ...] = ('none', 'beartype', 'pydantic')
@@ -44,7 +45,7 @@ def build_wrappers(templates: list[Path], out_dir: Path, config: Config | None =
     skipped: list[tuple[Path, str]] = []
     for template in templates:
         source = template.read_text(encoding='utf-8')
-        header = parse_header(source)
+        header = parse_header(source, resolved.syntax)
         if header is None:
             skipped.append((template, 'no {#def ... #} type header'))
             continue
@@ -66,9 +67,9 @@ def build_wrappers(templates: list[Path], out_dir: Path, config: Config | None =
 
 def template_name(template: Path, config: Config) -> str:
     """Return the name Jinja's loader uses, relative to the first configured template dir."""
-    for directory in config.template_dirs:
-        root = Path(directory).resolve()
-        candidate = template.resolve()
+    candidate = template.resolve()
+    for directory in search_paths(config.template_dirs):
+        root = directory.resolve()
         if root in candidate.parents:
             return candidate.relative_to(root).as_posix()
     return template.name

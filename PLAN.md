@@ -14,7 +14,7 @@ Distilled from research (see the "Python templating libraries with type support"
 
 The technique generalizes further than this implementation will. Transpiling a template to a throwaway host-language stub and running the host's type checker over it is engine-agnostic. We are choosing not to chase that, and this section records why so the question stays settled.
 
-In scope is Jinja2 together with Jinja supersets and dialects, meaning anything Jinja's own parser reads: plain Jinja2, JinjaX, and the template sets in Flask, Litestar, FastAPI, Copier, and Cookiecutter projects. A superset that adds tags through a Jinja Extension belongs here. Today such a superset works only when it keeps Jinja's standard delimiters, because `transpile()` builds a default `Environment(autoescape=True)` and `resolve.py` assumes a filesystem loader. Threading delimiters and a loader through `Config` is roadmap work, not a redesign.
+In scope is Jinja2 together with Jinja supersets and dialects, meaning anything Jinja's own parser reads: plain Jinja2, JinjaX, and the template sets in Flask, Litestar, FastAPI, Copier, and Cookiecutter projects. A superset that adds tags through a Jinja Extension belongs here. Delimiters are declared once under `[tool.types_for_jinja.syntax]` using `jinja2.Environment`'s own keyword names, and `template_dirs` accepts a `package:subdirectory` entry for templates shipped inside an installed package, which is what `PackageLoader` reads. A loader that is not backed by files at all (`DictLoader`, a database) still needs the templates on disk to be checked.
 
 Ansible, Salt, and dbt are out even though they parse as Jinja. Their contexts are untyped dicts assembled at runtime, so there is no declared type for a checker to check against, and all three lean on large custom filter libraries that `_filtered` collapses to `Any`. dbt already has TypeJinja, which works over dbt's own IR and understands `ref()` and `source()` in a way a generic Jinja checker cannot. Serving these would mean adopting three per-ecosystem filter catalogs plus a context-discovery story per host, and none of that work carries over to the templates we do serve.
 
@@ -167,6 +167,7 @@ v1 is a checker that is quiet (globals), scriptable (JSON/SARIF), and drops into
 - Shipped (v1.1): the LSP with Neovim integration, live unsaved-buffer checking (debounced so pyright does not queue behind keystrokes), and completion and hover for the typed context's own names, scoped per line and tolerant of the half-typed buffer that completion runs against; macro bodies, with a macro's own `{#def #}` block typing its parameters for its body and its callers across files; cross-file `{% extends %}` base-context and `{% import %}`/`{% from import %}` macro resolution; stable rule codes (`TJ###`) with inline `{# type: ignore #}` suppression.
 - Shipped (v1.1): `types-for-jinja wrapper`, which writes one typed render function per template with `--check` for CI, reads `[tool.types_for_jinja.wrapper]`, and takes a `--return-type` so a framework response class replaces `Markup`. Level-2 enforcement (`--validator beartype|pydantic`) rides on the same command; `examples/runtime` remains the runnable proof of both validators.
 - Shipped (v1.1): `{% include %}` context flow (the include is checked against the including template's context) and multi-level `{% extends %}` chains, both cycle-safe, with cross-file errors reported at the `{% include %}` or `{% extends %}` line of the file being checked rather than at a line number from another file.
+- Shipped (v1.1): configurable delimiters (`[tool.types_for_jinja.syntax]`) and `package:subdirectory` template directories, so a Jinja superset and a `PackageLoader` layout both check.
 - Shipped (v1.1): return types for Jinja's built-in filters and tests, emitted as an importable signature module beside the generated code, so a filtered expression keeps a real type instead of collapsing to `Any`. Argument types stay `Any` on purpose; an unknown filter still falls back to `Any`.
 
 ## Scope
@@ -191,7 +192,7 @@ v1 is a checker that is quiet (globals), scriptable (JSON/SARIF), and drops into
 - Framework adapters (Flask, Django-Jinja2, FastAPI) that locate "this view renders this template with this context"
 - Sidecar/registry binding as an alternative to the header
 - Custom extensions, i18n
-- Configurable Jinja delimiters and non-filesystem loaders, which are what a Jinja superset needs before it is fully supported
+- Loaders with no files behind them at all (`DictLoader`, a database), which the checker cannot read without executing the project
 
 Ruled out entirely, per "Scope boundary": Ansible, Salt, and dbt; engines not hosted in Python; and Python engines with different lookup semantics (DTL, Mako, Chameleon).
 

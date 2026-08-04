@@ -15,9 +15,9 @@ from pathlib import Path
 from jinja2 import Environment, TemplateSyntaxError, nodes
 
 from types_for_jinja import filters
-from types_for_jinja.config import Config
+from types_for_jinja.config import Config, Syntax
 from types_for_jinja.header import TemplateHeader, parse_defs
-from types_for_jinja.resolve import resolve_template
+from types_for_jinja.resolve import resolve_template, search_paths
 
 _CMP_OPS = {
     'eq': '==',
@@ -42,10 +42,11 @@ class _Emit:
     macro_types: MacroTypes
     search_dirs: list[Path]
     env: Environment
+    syntax: Syntax
     seen: frozenset[Path] = frozenset()
 
 
-def macro_defs(source: str, tree: nodes.Template) -> tuple[MacroTypes, list[str]]:
+def macro_defs(source: str, tree: nodes.Template, syntax: Syntax | None = None) -> tuple[MacroTypes, list[str]]:
     """Bind each ``{#def #}`` block inside a macro body to that macro.
 
     A block belongs to the closest macro that starts at or before it and still encloses
@@ -55,7 +56,7 @@ def macro_defs(source: str, tree: nodes.Template) -> tuple[MacroTypes, list[str]
     macros = sorted(tree.find_all(nodes.Macro), key=lambda node: node.lineno)
     types: MacroTypes = {}
     imports: list[str] = []
-    for block in parse_defs(source):
+    for block in parse_defs(source, syntax):
         owner = next(
             (
                 macro
@@ -69,6 +70,21 @@ def macro_defs(source: str, tree: nodes.Template) -> tuple[MacroTypes, list[str]
         types[owner.lineno] = dict(block.params)
         imports.extend(block.imports)
     return types, imports
+
+
+def build_environment(syntax: Syntax) -> Environment:
+    """A parsing-only Environment honouring a project's (possibly non-standard) delimiters."""
+    return Environment(
+        autoescape=True,
+        block_start_string=syntax.block_start_string,
+        block_end_string=syntax.block_end_string,
+        variable_start_string=syntax.variable_start_string,
+        variable_end_string=syntax.variable_end_string,
+        comment_start_string=syntax.comment_start_string,
+        comment_end_string=syntax.comment_end_string,
+        line_statement_prefix=syntax.line_statement_prefix,
+        line_comment_prefix=syntax.line_comment_prefix,
+    )
 
 
 def deepest_line(node: nodes.Node) -> int:
@@ -119,13 +135,14 @@ def transpile(
     ``from import`` references can be resolved against it and ``config.template_dirs``.
     """
     config = config or Config()
-    env = Environment(autoescape=True)
+    env = build_environment(config.syntax)
     tree = env.parse(source)
-    macro_types, macro_imports = macro_defs(source, tree)
+    macro_types, macro_imports = macro_defs(source, tree, config.syntax)
     ctx = _Emit(
         macro_types=macro_types,
         search_dirs=_search_dirs(template_path, config),
         env=env,
+        syntax=config.syntax,
         seen=frozenset({template_path.resolve()} if template_path is not None else ()),
     )
     split = _split_top_level(tree, ctx)
@@ -225,7 +242,7 @@ def _mark_foreign(lines: list[Line], lineno: int) -> list[Line]:
 
 def _search_dirs(template_path: Path | None, config: Config) -> list[Path]:
     dirs = [Path(template_path).parent] if template_path is not None else []
-    dirs.extend(Path(directory) for directory in config.template_dirs)
+    dirs.extend(search_paths(config.template_dirs))
     return dirs
 
 
@@ -394,7 +411,7 @@ def _load_macros(template: nodes.Node, ctx: _Emit) -> _ForeignMacros | None:
     loaded = _load_template(template, ctx)
     if loaded is None:
         return None
-    types, imports = macro_defs(loaded.source, loaded.tree)
+    types, imports = macro_defs(loaded.source, loaded.tree, ctx.syntax)
     return _ForeignMacros(
         macros={child.name: child for child in loaded.tree.body if isinstance(child, nodes.Macro)},
         types=types,
@@ -416,7 +433,7 @@ def _load_base_nodes(
     loaded = _load_template(node.template, ctx)
     if loaded is None:
         return []
-    base_types, base_imports = macro_defs(loaded.source, loaded.tree)
+    base_types, base_imports = macro_defs(loaded.source, loaded.tree, ctx.syntax)
     imports.extend(base_imports)
     base_ctx = replace(ctx, macro_types=base_types, seen=loaded.seen)
     top_level: list[nodes.Node] = []
@@ -440,7 +457,7 @@ def _load_include_nodes(node: nodes.Include, ctx: _Emit) -> tuple[list[nodes.Nod
     loaded = _load_template(node.template, ctx)
     if loaded is None:
         return [], ctx
-    types, _ = macro_defs(loaded.source, loaded.tree)
+    types, _ = macro_defs(loaded.source, loaded.tree, ctx.syntax)
     body = [child for child in loaded.tree.body if not isinstance(child, nodes.Extends)]
     return body, replace(ctx, macro_types=types, seen=loaded.seen)
 

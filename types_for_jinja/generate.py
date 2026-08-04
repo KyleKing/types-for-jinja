@@ -83,7 +83,7 @@ def stale(generated: Generated) -> list[Path]:
 
 def _stub_for(template: Path, out_dir: Path, config: Config) -> Stub | str:
     source = template.read_text(encoding='utf-8')
-    header = parse_header(source)
+    header = parse_header(source, config.syntax)
     if header is None:
         return 'no {#def ... #} type header'
     try:

@@ -47,14 +47,15 @@ def check_source(
 
 
 def _raw_diagnostics(source: str, path: Path, cache_dir: Path, config: Config | None) -> list[Diagnostic]:
-    header = parse_header(source)
+    resolved = config or load_config(Path.cwd())
+    header = parse_header(source, resolved.syntax)
     if header is None:
         return [Diagnostic(path, 1, 1, 'warning', 'no {#def ... #} type header; skipped', 'no-header')]
     malformed = header_errors(header)
     if malformed:
         return [Diagnostic(path, header.lineno, 1, 'error', message, 'bad-header') for message in malformed]
     try:
-        module = transpile(source, header, config or load_config(Path.cwd()), template_path=path)
+        module = transpile(source, header, resolved, template_path=path)
     except TemplateSyntaxError as err:
         return [Diagnostic(path, err.lineno or 1, 1, 'error', f'template syntax error: {err.message}', 'syntax-error')]
     cache_dir.mkdir(parents=True, exist_ok=True)

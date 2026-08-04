@@ -113,7 +113,22 @@ A helper that does real work before rendering, or sets a status code, stays hand
 
 ## Scope
 
-`types-for-jinja` checks anything Jinja's own parser reads: plain Jinja2, JinjaX, and the templates in Flask, Litestar, FastAPI, Copier, and Cookiecutter projects, as long as the standard delimiters are kept. Out of scope on purpose: Ansible, Salt, and dbt (untyped runtime contexts and large custom filter libraries, and dbt already has TypeJinja), engines not hosted in Python (Nunjucks, Twig, Liquid, Handlebars), and Python engines with different lookup semantics (Django's DTL, Mako, Chameleon). See [PLAN] for the reasoning.
+`types-for-jinja` checks anything Jinja's own parser reads: plain Jinja2, JinjaX, and the templates in Flask, Litestar, FastAPI, Copier, and Cookiecutter projects. A superset that changes Jinja's delimiters declares them once, using the same names `jinja2.Environment` uses:
+
+```toml
+[tool.types_for_jinja.syntax]
+variable_start_string = "[["
+variable_end_string = "]]"
+```
+
+Templates shipped inside an installed package (what `jinja2.PackageLoader` loads) are reachable with a `package:subdirectory` entry in `template_dirs`, alongside plain paths:
+
+```toml
+[tool.types_for_jinja]
+template_dirs = ["myapp:templates", "local/templates"]
+```
+
+Out of scope on purpose: Ansible, Salt, and dbt (untyped runtime contexts and large custom filter libraries, and dbt already has TypeJinja), engines not hosted in Python (Nunjucks, Twig, Liquid, Handlebars), and Python engines with different lookup semantics (Django's DTL, Mako, Chameleon). See [PLAN] for the reasoning.
 
 ## Project Status
 
@@ -141,6 +156,9 @@ If you have any security issue to report, please contact the project maintainers
 ## License
 
 [LICENSE]
+
+```
+```
 
 [changelog]: https://types-for-jinja.kyleking.me/docs/CHANGELOG
 [code_tag_summary]: https://types-for-jinja.kyleking.me/docs/CODE_TAG_SUMMARY

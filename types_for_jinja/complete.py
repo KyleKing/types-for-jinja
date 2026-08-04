@@ -13,17 +13,22 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from jinja2 import Environment, TemplateSyntaxError, nodes
+from jinja2 import TemplateSyntaxError, nodes
 
-from types_for_jinja.config import Config
+from types_for_jinja.config import Config, Syntax
 from types_for_jinja.header import TemplateHeader
-from types_for_jinja.transpile import MacroTypes, deepest_line, macro_defs
+from types_for_jinja.transpile import MacroTypes, build_environment, deepest_line, macro_defs
 
 _IDENT_RUN = re.compile(r'[A-Za-z_][A-Za-z0-9_]*$')
 _WORD_AT = re.compile(r'[A-Za-z_][A-Za-z0-9_]*')
-_OPENERS = ('{{', '{%', '{#')
-_CLOSERS = ('}}', '%}', '#}')
-_CLOSING = {'{{': ' }}', '{%': ' %}', '{#': ' #}'}
+
+
+def _delimiters(syntax: Syntax) -> tuple[tuple[str, ...], tuple[str, ...], dict[str, str], str]:
+    """Openers, closers, the closer for each opener, and the comment opener."""
+    openers = (syntax.variable_start_string, syntax.block_start_string, syntax.comment_start_string)
+    closers = (syntax.variable_end_string, syntax.block_end_string, syntax.comment_end_string)
+    return openers, closers, {o: f' {c}' for o, c in zip(openers, closers, strict=True)}, openers[2]
+
 
 __all__ = ['ContextName', 'CursorContext', 'context_names', 'cursor_context', 'describe']
 
@@ -46,16 +51,17 @@ class CursorContext:
     prefix: str
 
 
-def cursor_context(line_text: str, column: int) -> CursorContext:
+def cursor_context(line_text: str, column: int, syntax: Syntax | None = None) -> CursorContext:
     """Classify the cursor at zero-based ``column`` of ``line_text``.
 
     ``attribute_of`` is the dotted expression left of a trailing ``.`` (empty when the
     cursor is completing a bare name). Only ``{{ }}`` and ``{% %}`` count as expressions;
     a ``{# #}`` comment does not.
     """
+    openers, closers, _, comment = _delimiters(syntax or Syntax())
     head = line_text[:column]
-    opener, closer = _last_index(head, _OPENERS), _last_index(head, _CLOSERS)
-    if opener is None or (closer is not None and closer > opener) or head[opener : opener + 2] == '{#':
+    opener, closer = _last_index(head, openers), _last_index(head, closers)
+    if opener is None or (closer is not None and closer > opener) or head.startswith(comment, opener):
         return CursorContext(in_expression=False, attribute_of='', prefix='')
     match = _IDENT_RUN.search(head)
     prefix = match.group(0) if match else ''
@@ -78,9 +84,9 @@ def context_names(
     param_names = {name for name, _ in header.params}
     found = [ContextName(name, type_str, 'parameter') for name, type_str in header.params]
     found.extend(ContextName(name, type_str, 'global') for name, type_str in config.globals if name not in param_names)
-    tree = _parse_tolerantly(source, line)
+    tree = _parse_tolerantly(source, line, config.syntax)
     if tree is not None:
-        macro_types, _ = macro_defs(source, tree)
+        macro_types, _ = macro_defs(source, tree, config.syntax)
         _scan(tree.body, line, source.count('\n') + 1, found, macro_types)
     return sorted(_deduplicate(found), key=lambda entry: entry.name)
 
@@ -98,16 +104,17 @@ def word_at(line_text: str, column: int) -> str:
     return ''
 
 
-def _parse_tolerantly(source: str, line: int) -> nodes.Template | None:
+def _parse_tolerantly(source: str, line: int, syntax: Syntax) -> nodes.Template | None:
     """Parse ``source``, first as written, then with the half-typed line closed, then blanked.
 
     Blanking rather than deleting keeps every other line at its original number.
     """
-    for candidate in (source, _with_line(source, line, _closed), _with_line(source, line, lambda _: '')):
+    repairs = (lambda text: _closed(text, syntax), lambda _: '')
+    for candidate in (source, *(_with_line(source, line, repair) for repair in repairs)):
         if candidate is None:
             continue
         try:
-            return Environment(autoescape=True).parse(candidate)
+            return build_environment(syntax).parse(candidate)
         except TemplateSyntaxError:
             continue
     return None
@@ -124,15 +131,16 @@ def _with_line(source: str, line: int, repair: Callable[[str], str | None]) -> s
     return '\n'.join(lines) + '\n'
 
 
-def _closed(text: str) -> str | None:
+def _closed(text: str, syntax: Syntax) -> str | None:
     """Terminate a delimiter left open on ``text``, or ``None`` when none is open."""
-    opener = _last_index(text, _OPENERS)
+    openers, closers, closing, _ = _delimiters(syntax)
+    opener = _last_index(text, openers)
     if opener is None:
         return None
-    closer = _last_index(text, _CLOSERS)
+    closer = _last_index(text, closers)
     if closer is not None and closer > opener:
         return None
-    return text + _CLOSING[text[opener : opener + 2]]
+    return text + next(closing[token] for token in openers if text.startswith(token, opener))
 
 
 def _last_index(head: str, tokens: tuple[str, ...]) -> int | None:
