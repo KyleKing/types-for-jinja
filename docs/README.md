@@ -100,6 +100,15 @@ templates/page.html.jinja:6:7: error[invalid-argument-type] Expected `int`, foun
 
 An attribute the component does not declare is not an error, because JinjaX forwards it to the component as `attrs`, which is what `class="wide"` above relies on.
 
+A tag an extension adds does not parse until the extension is loaded, and an unparseable template is skipped entirely, so its own errors go unreported too. Declaring the extension is what makes the rest of the template checkable:
+
+```toml
+[tool.types_for_jinja]
+extensions = ["do", "i18n", "loopcontrols"]
+```
+
+`i18n` also declares the names it injects (`_`, `gettext`, `ngettext`, `pgettext`, `npgettext`), so a template using them needs nothing else.
+
 Jinja's built-in filters carry their return type, so a filtered expression is still checked: `{{ items | length }}` is an `int`, and `{% for x in items | sort %}` still knows what `x` is. Only the return type is pinned, because a filter catalog that guesses at argument types reports errors on correct templates. A filter the catalog does not know (yours, or one from an extension) falls back to `Any`.
 
 ## Installation
@@ -139,6 +148,7 @@ Everything lives under `[tool.types_for_jinja]` in `pyproject.toml`, and every s
 | `suppression` | `portable` | Which ignore comment `{# type: ignore #}` becomes: `portable`, `mypy`, `pyright`, or `ty` |
 | `template_dirs` | none | Where `{% extends %}`, `{% include %}`, and `{% import %}` are resolved from. Accepts `package:subdirectory` |
 | `language_server` | first found | Pins the language server attribute completion asks, instead of taking the first on `PATH` |
+| `extensions` | none | jinja2 extensions to load so their tags parse: `debug`, `do`, `i18n`, `loopcontrols` |
 | `syntax` | Jinja's own | Delimiters, using `jinja2.Environment`'s own keyword names |
 | `wrapper` | see below | Options for `types-for-jinja wrapper` |
 
@@ -236,7 +246,7 @@ Out of scope on purpose: Ansible, Salt, and dbt (untyped runtime contexts and la
 - A template with no line-aligned form (rare; measured under 3% on real template sets) falls back to `# L<n>` markers, which `remap` and the mirror still read, and raw checker output does not.
 - Filter and test argument types are unchecked; only built-in return types are pinned, and unknown filters widen to `Any`.
 - A JinjaX component tag that cannot be resolved to a file is skipped, which includes any tag carrying a catalog prefix (`<ui:Button />`), because the prefix maps to a search path that lives in the catalog rather than in the template.
-- Tags from Jinja extensions (`{% trans %}`, `{% do %}`, `{% break %}`) fail Jinja's parser unless the extension is loaded, so those templates are skipped with a warning. There is no setting to declare them yet.
+- Only jinja2's own extensions can be declared. A project-defined extension would mean importing project code to parse a template, and a custom tag's meaning is not inferable from its parser hook, so those templates are skipped with a warning.
 - Templates that exist only behind a `DictLoader` or a database still need a copy on disk to be checked.
 
 ## Project Status

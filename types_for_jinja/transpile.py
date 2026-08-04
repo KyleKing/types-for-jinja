@@ -15,7 +15,7 @@ from pathlib import Path
 from jinja2 import Environment, TemplateSyntaxError, nodes
 
 from types_for_jinja import components, filters
-from types_for_jinja.config import Config, Syntax
+from types_for_jinja.config import EXTENSIONS, Config, Syntax
 from types_for_jinja.emit import relative_module
 from types_for_jinja.header import TemplateHeader, parse_defs
 from types_for_jinja.resolve import resolve_template, search_paths
@@ -76,10 +76,15 @@ def macro_defs(source: str, tree: nodes.Template, syntax: Syntax | None = None) 
     return types, imports
 
 
-def build_environment(syntax: Syntax) -> Environment:
-    """A parsing-only Environment honouring a project's (possibly non-standard) delimiters."""
+def build_environment(syntax: Syntax, extensions: list[str] | None = None) -> Environment:
+    """A parsing-only Environment honouring a project's delimiters and declared extensions.
+
+    An extension has to be loaded for Jinja to accept the tags it adds, so a template using
+    ``{% trans %}`` or ``{% do %}`` fails to parse until the project declares it.
+    """
     return Environment(
         autoescape=True,
+        extensions=[f'jinja2.ext.{name}' for name in extensions or ()],
         block_start_string=syntax.block_start_string,
         block_end_string=syntax.block_end_string,
         variable_start_string=syntax.variable_start_string,
@@ -146,7 +151,7 @@ def transpile(
     on its relative import of the generated filter signatures.
     """
     config = config or Config()
-    env = build_environment(config.syntax)
+    env = build_environment(config.syntax, config.extensions)
     tree = env.parse(source)
     macro_types, macro_imports = macro_defs(source, tree, config.syntax)
     ctx = _Emit(
@@ -238,7 +243,22 @@ def _preamble(header: TemplateHeader, config: Config, extra_imports: list[str]) 
     lines.extend(
         Line(0, f'{name}: {type_str}', header.lineno) for name, type_str in config.globals if name not in param_names
     )
+    declared_globals = {name for name, _ in config.globals}
+    lines.extend(
+        Line(0, f'{name}: _TJAny', header.lineno)
+        for name in _extension_globals(config)
+        if name not in param_names and name not in declared_globals
+    )
     return lines
+
+
+def _extension_globals(config: Config) -> list[str]:
+    """Names a declared extension injects, which are otherwise undefined variables.
+
+    Enabling i18n gives a template ``_``, ``gettext``, and the rest without the project ever
+    naming them, so declaring the extension has to declare them too.
+    """
+    return [name for extension in config.extensions for name in EXTENSIONS[extension]]
 
 
 def _unique(items: list[str]) -> list[str]:

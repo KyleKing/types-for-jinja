@@ -124,7 +124,7 @@ def diagnose(source: str, template: Path, config: Config) -> list[Diagnostic]:
 def _syntax_error_line(source: str, config: Config) -> int:
     """Where Jinja's own parser gave up, so the diagnostic lands on the broken tag."""
     try:
-        build_environment(config.syntax).parse(source)
+        build_environment(config.syntax, config.extensions).parse(source)
     except TemplateSyntaxError as err:
         return err.lineno or 1
     return 1

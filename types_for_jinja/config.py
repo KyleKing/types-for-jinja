@@ -48,6 +48,19 @@ class Syntax:
 DEFAULT_OUT_DIR = '_jinja_stubs'
 """Where generated stubs go. Must not start with a dot, which pyright excludes by default."""
 
+EXTENSIONS: dict[str, tuple[str, ...]] = {
+    'debug': (),
+    'do': (),
+    'i18n': ('_', 'gettext', 'ngettext', 'npgettext', 'pgettext'),
+    'loopcontrols': (),
+}
+"""The extensions that may be declared, and the globals each one injects.
+
+Only jinja2's own, by short name. A project-defined extension would mean importing project
+code into the parsing Environment, which crosses the static-only line, and a custom tag's
+meaning is not inferable from its parser hook anyway.
+"""
+
 
 @dataclass(frozen=True)
 class Config:
@@ -58,6 +71,7 @@ class Config:
     looking.
     """
 
+    extensions: list[str] = field(default_factory=list)
     imports: list[str] = field(default_factory=list)
     globals: list[tuple[str, str]] = field(default_factory=list)
     language_server: str = ''
@@ -78,6 +92,7 @@ def load_config(root: Path) -> Config:
         return Config()
     declared = table.get('globals', {})
     return Config(
+        extensions=_extensions(table.get('extensions', [])),
         imports=list(table.get('imports', [])),
         globals=[(name, type_str) for name, type_str in declared.items()],
         language_server=str(table.get('language_server', '')),
@@ -87,6 +102,20 @@ def load_config(root: Path) -> Config:
         wrapper=WrapperConfig(**_known(WrapperConfig, table.get('wrapper', {}))),
         syntax=Syntax(**_known(Syntax, table.get('syntax', {}))),
     )
+
+
+def _extensions(values: list[str]) -> list[str]:
+    """Reject an extension this project cannot load, naming the ones it can.
+
+    Accepting a name silently would leave the template failing to parse with no hint that the
+    declaration was the problem.
+    """
+    unknown = [value for value in values if value not in EXTENSIONS]
+    if unknown:
+        known = ', '.join(sorted(EXTENSIONS))
+        msg = f'unknown extensions {unknown}; expected any of {known}'
+        raise ValueError(msg)
+    return list(values)
 
 
 def _out_dir(value: str) -> str:

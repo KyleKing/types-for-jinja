@@ -110,7 +110,7 @@ def context_names(
     param_names = {param.name for param in header.params}
     found = [ContextName(param.name, param.annotation or 'Any', 'parameter') for param in header.params]
     found.extend(ContextName(name, type_str, 'global') for name, type_str in config.globals if name not in param_names)
-    tree = _parse_tolerantly(source, line, config.syntax)
+    tree = _parse_tolerantly(source, line, config.syntax, config.extensions)
     if tree is not None:
         macro_types, _ = macro_defs(source, tree, config.syntax)
         _scan(tree.body, line, source.count('\n') + 1, found, macro_types)
@@ -128,7 +128,7 @@ def probe_module(source: str, header: TemplateHeader, config: Config, line: int,
     self-contained: it resolves wherever it is claimed to live, with no generated stub tree
     needed beside it.
     """
-    repaired = _repaired(source, line, config.syntax)
+    repaired = _repaired(source, line, config.syntax, config.extensions)
     if repaired is None:
         return None
     try:
@@ -152,14 +152,14 @@ def _inlined(entry: Line) -> str:
     return '    ' * entry.indent + entry.text
 
 
-def _repaired(source: str, line: int, syntax: Syntax) -> str | None:
+def _repaired(source: str, line: int, syntax: Syntax, extensions: list[str] | None = None) -> str | None:
     """The first variant of ``source`` that parses, closing or blanking the half-typed line."""
     repairs = (lambda text: _closed(text, syntax), lambda _: '')
     for candidate in (_with_line(source, line, repair) for repair in repairs):
         if candidate is None:
             continue
         try:
-            build_environment(syntax).parse(candidate)
+            build_environment(syntax, extensions).parse(candidate)
         except TemplateSyntaxError:
             continue
         return candidate
@@ -179,7 +179,12 @@ def word_at(line_text: str, column: int) -> str:
     return ''
 
 
-def _parse_tolerantly(source: str, line: int, syntax: Syntax) -> nodes.Template | None:
+def _parse_tolerantly(
+    source: str,
+    line: int,
+    syntax: Syntax,
+    extensions: list[str] | None = None,
+) -> nodes.Template | None:
     """Parse ``source``, first as written, then with the half-typed line closed, then blanked.
 
     Blanking rather than deleting keeps every other line at its original number.
@@ -189,7 +194,7 @@ def _parse_tolerantly(source: str, line: int, syntax: Syntax) -> nodes.Template 
         if candidate is None:
             continue
         try:
-            return build_environment(syntax).parse(candidate)
+            return build_environment(syntax, extensions).parse(candidate)
         except TemplateSyntaxError:
             continue
     return None

@@ -102,8 +102,19 @@ def _wrapper_config(args: argparse.Namespace, config: Config) -> Config:
     return replace(config, wrapper=replace(config.wrapper, **overrides))
 
 
+_EXIT_BAD_CONFIG = 2
+
+
 def main(argv: list[str] | None = None) -> int:
     """Dispatch a subcommand; return a non-zero exit code when it reports a problem."""
+    try:
+        return _dispatch(argv)
+    except ValueError as err:
+        _warn(f'{err} (in [tool.types_for_jinja] of pyproject.toml)')
+        return _EXIT_BAD_CONFIG
+
+
+def _dispatch(argv: list[str] | None) -> int:
     default_out_dir = Path(load_config(Path.cwd()).out_dir)
     parser = argparse.ArgumentParser(prog='types-for-jinja')
     subparsers = parser.add_subparsers(dest='command', required=True)
