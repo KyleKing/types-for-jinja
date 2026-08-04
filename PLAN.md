@@ -183,7 +183,7 @@ v1 is a checker that is quiet (globals), scriptable (JSON/SARIF), and drops into
 - JSON / SARIF output
 - CLI `types-for-jinja check <paths>` with non-zero exit on errors
 
-**Landed in v1.1 (see Status above):** the LSP with live-buffer checking, macro bodies, cross-file `{% extends %}`/`{% import %}` context, and rule codes with inline suppression.
+**Landed in v1.1 (see Status above):** the LSP with live-buffer checking plus context, member, filter, test, and tag completion; typed macro parameters; cross-file `{% extends %}` chains, `{% include %}`, and `{% import %}` context; built-in filter return types; configurable delimiters and package template directories; `types-for-jinja wrapper`; and rule codes with inline suppression.
 
 **Still deferred:**
 
@@ -212,7 +212,7 @@ What worked: on `error.html.jinja` (extends `base.html.jinja`, fills `{% block c
 Two concrete gaps this surfaced, now pulled into the v1 scope above:
 
 1. **Jinja Environment globals** (`static_url()`, `url_for()`, `get_flashed_messages()`). These are injected into `Environment.globals`, not passed per render, so a template that calls one gets flagged as an undefined variable (false positive). v1 needs a project-level declaration of global names/signatures (a config file or a `{#globals#}` header) so the checker treats them as defined. Highest-value fix for Flask and any real app.
-1. **Inheritance context flow.** A child template's effective context spans the child and its base (and any `{% include %}`). v1 checks one file at a time, so variables a base template needs are not cross-checked against the child's header. Modeling `{% extends %}` / `{% block %}` / `{% include %}` context flow is a v1.1 feature.
+1. **Inheritance context flow.** A child template's effective context spans the child and its base (and any `{% include %}`). v1 checked one file at a time, so variables a base template needed were not cross-checked against the child's header. Shipped in v1.1: whole `{% extends %}` chains and `{% include %}` bodies check against the including template's context.
 
 ## Open questions
 
