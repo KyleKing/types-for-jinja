@@ -1,4 +1,4 @@
-"""The Diagnostic value type, shared by the checker, reporters, and LSP."""
+"""The Diagnostic value type, shared by ``generate`` and the language server."""
 
 from __future__ import annotations
 
@@ -8,10 +8,14 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class Diagnostic:
-    """A type error located back in the original template.
+    """Something types-for-jinja itself found, located in the template.
 
-    ``rule`` is pyright's own rule name. ``code`` is the stable types-for-jinja code
-    (for example ``TJ001``) assigned from ``rule``, empty when unmapped.
+    Only the four cases it can determine without a type checker: a missing or malformed
+    ``{#def #}`` header, a Jinja syntax error, and a construct the transpiler cannot model.
+    Everything about the types comes from the project's own checker reading the stub.
+
+    ``reason`` is a short stable tag (``no-header``, ``bad-header``, ``syntax-error``,
+    ``skipped``) for a client that wants to group these without matching on the message.
     """
 
     path: Path
@@ -19,5 +23,4 @@ class Diagnostic:
     column: int
     severity: str
     message: str
-    rule: str
-    code: str = ''
+    reason: str

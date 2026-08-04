@@ -1,4 +1,9 @@
-"""Command-line entry point: ``types-for-jinja check <paths> [--format ...]``."""
+"""Command-line entry point.
+
+Three subcommands, and none of them runs a type checker. ``generate`` writes the stubs the
+project's own checker picks up, ``remap`` rewrites that checker's output to name templates,
+and ``wrapper`` writes a typed render function per template.
+"""
 
 from __future__ import annotations
 
@@ -8,15 +13,11 @@ import sys
 from dataclasses import replace
 from pathlib import Path
 
-from types_for_jinja.check import Diagnostic, PyrightNotFoundError, check_file
 from types_for_jinja.config import Config, load_config
 from types_for_jinja.emit import stale_files, write_files
 from types_for_jinja.generate import generate, stale, write
 from types_for_jinja.remap import FORMATS, Remapper, remap
-from types_for_jinja.report import format_json, format_sarif, format_text
 from types_for_jinja.wrapper import VALIDATORS, build_wrappers
-
-_FORMATTERS = {'text': format_text, 'json': format_json, 'sarif': format_sarif}
 
 
 def _warn(message: str) -> None:
@@ -102,12 +103,10 @@ def _wrapper_config(args: argparse.Namespace, config: Config) -> Config:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run the checker over the given paths; return a non-zero exit code on errors."""
+    """Dispatch a subcommand; return a non-zero exit code when it reports a problem."""
+    default_out_dir = Path(load_config(Path.cwd()).out_dir)
     parser = argparse.ArgumentParser(prog='types-for-jinja')
     subparsers = parser.add_subparsers(dest='command', required=True)
-    check_parser = subparsers.add_parser('check', help='type-check Jinja templates')
-    check_parser.add_argument('paths', nargs='+', type=Path, help='template files or directories')
-    check_parser.add_argument('--format', choices=list(_FORMATTERS), default='text', help='output format')
     generate_parser = subparsers.add_parser(
         'generate',
         help='write type-checking stubs for your own type checker to pick up',
@@ -117,7 +116,7 @@ def main(argv: list[str] | None = None) -> int:
         '-o',
         '--out-dir',
         type=Path,
-        default=Path('_jinja_stubs'),
+        default=default_out_dir,
         help='output directory; must not start with a dot, which pyright excludes by default',
     )
     generate_parser.add_argument(
@@ -129,7 +128,7 @@ def main(argv: list[str] | None = None) -> int:
         'remap',
         help="rewrite a type checker's output so it names templates instead of generated stubs",
     )
-    remap_parser.add_argument('-o', '--out-dir', type=Path, default=Path('_jinja_stubs'), help='the stub directory')
+    remap_parser.add_argument('-o', '--out-dir', type=Path, default=default_out_dir, help='the stub directory')
     remap_parser.add_argument(
         '--format',
         choices=list(FORMATS),
@@ -173,26 +172,8 @@ def main(argv: list[str] | None = None) -> int:
     templates = _iter_templates(args.paths)
     if args.command == 'generate':
         return _generate(templates, args.out_dir, check_only=args.check)
-    if args.command == 'wrapper':
-        config = _wrapper_config(args, load_config(Path.cwd()))
-        out_dir = args.out_dir or Path(config.wrapper.out_dir)
-        return _wrapper(templates, config, out_dir, check_only=args.check)
-    try:
-        diagnostics: list[Diagnostic] = [diag for template in templates for diag in check_file(template)]
-    except PyrightNotFoundError:
-        message = 'types-for-jinja: pyright not found on PATH; install it (for example `uv tool install pyright`)'
-        print(message, file=sys.stderr)  # ruff:ignore[print]
-        return 2
-    error_count = sum(diag.severity == 'error' for diag in diagnostics)
-
-    rendered = _FORMATTERS[args.format](diagnostics)
-    if rendered:
-        print(rendered)  # ruff:ignore[print]
-    if args.format == 'text':
-        sys.stdout.flush()
-        summary = f'Checked {len(templates)} template(s): {error_count} error(s)'
-        print(summary, file=sys.stderr)  # ruff:ignore[print]
-    return 1 if error_count else 0
+    config = _wrapper_config(args, load_config(Path.cwd()))
+    return _wrapper(templates, config, args.out_dir or Path(config.wrapper.out_dir), check_only=args.check)
 
 
 if __name__ == '__main__':

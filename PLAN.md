@@ -105,7 +105,6 @@ Decided after the backend evidence (below) proved pyright, ty, and mypy read the
 
 Ordered so each step lands independently. `check` is deleted last, after its replacements exist.
 
-1. **Delete `check`.** Remove `check.py`, `codes.py`, `report.py`, and the `.types_for_jinja_cache` layout. Rewrite the pyright-gated tests (seven files gate on `shutil.which('pyright')`, and `tests/test_v11_crossfile.py`, `tests/test_v11_macro.py`, and `tests/test_v1_realworld.py` assert on literal pyright rule names) against generated stubs and `tests/test_backends.py`. The `suppression` machinery stays; `generate` is its consumer.
 1. **Docs.** README rewritten and BACKENDS.md merged into "Backend evidence" below (both done pre-emptively), CHANGELOG entry, and docs/BLUE_SKY.md holding the unscheduled items.
 
 ### File and line fidelity

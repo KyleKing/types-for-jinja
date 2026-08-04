@@ -2,7 +2,8 @@
 
 from pathlib import Path
 
-from types_for_jinja.check import check_source
+from types_for_jinja.config import Config
+from types_for_jinja.generate import diagnose
 from types_for_jinja.header import header_errors, parse_defs, parse_header
 
 _COLLAPSED = '{#def from examples.models import User user: User #}\n<h1>{{ user.name }}</h1>\n'
@@ -36,10 +37,12 @@ def test_unparsable_annotation_is_reported():
     assert 'malformed annotation' in header_errors(header)[0]
 
 
-def test_malformed_header_short_circuits_the_checker(tmp_path):
-    diagnostics = check_source(_COLLAPSED, Path('t.html.jinja'), cache_dir=tmp_path)
+def test_malformed_header_is_reported_before_any_stub_is_written():
+    """A collapsed header still matches the pattern but no longer parses, so nothing downstream runs."""
+    diagnostics = diagnose(_COLLAPSED, Path('t.html.jinja'), Config())
 
-    assert [(d.line, d.code) for d in diagnostics] == [(1, 'TJ011')]
+    assert [(d.line, d.severity) for d in diagnostics] == [(1, 'error')]
+    assert 'malformed' in diagnostics[0].message
 
 
 def test_macros_only_file_has_no_template_header():

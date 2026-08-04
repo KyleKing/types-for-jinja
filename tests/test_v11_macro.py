@@ -1,12 +1,16 @@
 """Macro body and macro-call checking."""
 
-from pathlib import Path
 
-from types_for_jinja.check import check_file
+from types_for_jinja.config import Config
 
-from .configuration import requires_pyright
+from . import checked
+from .backends import STUB_DIR
+from .checked import reported, write_template
+from .configuration import requires_checker
 
-pytestmark = requires_pyright
+pytestmark = requires_checker(checked.DEFAULT_BACKEND)
+
+_CONFIG = Config(out_dir=STUB_DIR)
 
 _BAD_BODY = """{#def
 title: str
@@ -74,48 +78,40 @@ title: str
 """
 
 
-def _write(tmp_path: Path, text: str) -> Path:
-    path = tmp_path / 'macro.html.jinja'
-    path.write_text(text, encoding='utf-8')
-    return path
+def _checked(text: str) -> list[checked.Reported]:
+    """Write the macro template into the current project and report what the checker says."""
+    return reported(write_template('templates/macro.html.jinja', text), _CONFIG)
 
 
-def test_macro_body_undefined_var_errors(tmp_path):
-    diags = check_file(_write(tmp_path, _BAD_BODY), cache_dir=tmp_path)
-
-    assert any(d.rule == 'reportUndefinedVariable' and 'missing_var' in d.message for d in diags)
+def test_macro_body_undefined_var_errors(examples_project):
+    assert any(entry.mentions('missing_var') for entry in _checked(_BAD_BODY))
 
 
-def test_macro_call_missing_arg_errors(tmp_path):
-    diags = check_file(_write(tmp_path, _WRONG_ARITY), cache_dir=tmp_path)
-
-    assert any(d.rule == 'reportCallIssue' for d in diags)
+def test_macro_call_missing_arg_errors(examples_project):
+    assert [entry.line for entry in _checked(_WRONG_ARITY)] == [5]
 
 
-def test_macro_correct_usage_clean(tmp_path):
-    assert check_file(_write(tmp_path, _OK), cache_dir=tmp_path) == []
+def test_macro_correct_usage_clean(examples_project):
+    assert _checked(_OK) == []
 
 
-def test_declared_macro_param_catches_a_bad_attribute_in_the_body(tmp_path):
-    diags = check_file(_write(tmp_path, _TYPED_BAD_ATTR), cache_dir=tmp_path)
-
-    assert any(d.rule == 'reportAttributeAccessIssue' and 'naem' in d.message for d in diags)
+def test_declared_macro_param_catches_a_bad_attribute_in_the_body(examples_project):
+    assert any(entry.mentions('naem') for entry in _checked(_TYPED_BAD_ATTR))
 
 
-def test_declared_macro_param_is_clean_when_the_attribute_exists(tmp_path):
-    assert check_file(_write(tmp_path, _TYPED_OK), cache_dir=tmp_path) == []
+def test_declared_macro_param_is_clean_when_the_attribute_exists(examples_project):
+    assert _checked(_TYPED_OK) == []
 
 
-def test_declared_macro_param_checks_the_call_argument_type(tmp_path):
-    diags = check_file(_write(tmp_path, _TYPED_WRONG_ARG), cache_dir=tmp_path)
-
-    assert any(d.rule == 'reportArgumentType' for d in diags)
-
-
-def test_declared_macro_param_with_a_default_stays_typed(tmp_path):
-    assert check_file(_write(tmp_path, _TYPED_DEFAULT), cache_dir=tmp_path) == []
+def test_declared_macro_param_checks_the_call_argument_type(examples_project):
+    """A declared parameter type is what makes the call site checkable, not just the body."""
+    assert [entry.line for entry in _checked(_TYPED_WRONG_ARG)] == [12]
 
 
-def test_undeclared_macro_params_still_check_the_body(tmp_path):
+def test_declared_macro_param_with_a_default_stays_typed(examples_project):
+    assert _checked(_TYPED_DEFAULT) == []
+
+
+def test_undeclared_macro_params_still_check_the_body(examples_project):
     """Without a macro {#def #} block nothing regresses; the params are simply untyped."""
-    assert check_file(_write(tmp_path, _OK), cache_dir=tmp_path) == []
+    assert _checked(_OK) == []

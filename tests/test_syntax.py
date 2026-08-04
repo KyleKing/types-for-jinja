@@ -2,13 +2,15 @@
 
 from pathlib import Path
 
-from types_for_jinja.check import check_source
 from types_for_jinja.complete import cursor_context
 from types_for_jinja.config import Config, Syntax, load_config
 from types_for_jinja.header import parse_header
 from types_for_jinja.resolve import search_paths
 
-from .configuration import requires_pyright
+from . import checked
+from .backends import STUB_DIR
+from .checked import reported, write_template
+from .configuration import requires_checker
 
 _SQUARE = Syntax(
     block_start_string='[%',
@@ -43,11 +45,15 @@ def test_cursor_context_follows_custom_delimiters():
     assert not cursor_context('<p>{{ us', 8, _SQUARE).in_expression
 
 
-@requires_pyright
-def test_checker_reads_a_template_with_custom_delimiters(tmp_path):
-    diags = check_source(_TEMPLATE, Path('sq.html.jinja'), cache_dir=tmp_path, config=Config(syntax=_SQUARE))
+@requires_checker(checked.DEFAULT_BACKEND)
+def test_a_template_with_custom_delimiters_is_checked(examples_project):
+    """A Jinja superset that moves the delimiters still gets its expressions checked."""
+    template = write_template('templates/sq.html.jinja', _TEMPLATE)
 
-    assert [(d.line, d.code) for d in diags] == [(5, 'TJ002')]
+    found = reported(template, Config(syntax=_SQUARE, out_dir=STUB_DIR))
+
+    assert [entry.line for entry in found] == [5]
+    assert found[0].mentions('naem')
 
 
 def test_load_config_reads_the_syntax_table(tmp_path):

@@ -1,13 +1,19 @@
-"""Tests for Environment-globals configuration."""
+"""Tests for Environment-globals configuration.
+
+Without a declaration, a template calling ``static_url()`` is a false positive, and a tool
+that cries wolf gets uninstalled.
+"""
 
 from pathlib import Path
 
-from types_for_jinja.check import check_file
 from types_for_jinja.config import Config, load_config
 from types_for_jinja.header import parse_header
 from types_for_jinja.transpile import transpile
 
-from .configuration import requires_pyright
+from . import checked
+from .backends import STUB_DIR
+from .checked import reported
+from .configuration import requires_checker
 
 _USES_GLOBALS = Path('examples/templates/uses_globals.html.jinja')
 
@@ -40,6 +46,20 @@ def test_transpile_with_config_declares_globals():
     assert 'static_url: Callable[[str], str]' in code
 
 
-@requires_pyright
-def test_check_globals_template_is_clean(tmp_path):
-    assert check_file(_USES_GLOBALS, cache_dir=tmp_path) == []
+@requires_checker(checked.DEFAULT_BACKEND)
+def test_a_declared_global_is_not_a_false_positive(examples_project):
+    config = Config(
+        imports=['from collections.abc import Callable'],
+        globals=[('static_url', 'Callable[[str], str]'), ('current_route', 'str')],
+        out_dir=STUB_DIR,
+    )
+
+    assert reported(_USES_GLOBALS, config) == []
+
+
+@requires_checker(checked.DEFAULT_BACKEND)
+def test_an_undeclared_global_is_reported(examples_project):
+    """Proves the declaration is what silences it, rather than the checker never looking."""
+    found = reported(_USES_GLOBALS, Config(out_dir=STUB_DIR))
+
+    assert any(entry.mentions('static_url') for entry in found)

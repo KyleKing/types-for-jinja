@@ -26,16 +26,21 @@ _VERSION = 1
 
 @dataclass(frozen=True)
 class Entry:
-    """One stub, the template it came from, and the files that stub needs beside it.
+    """One generated module, the template it came from, and the files it needs beside it.
 
     ``support`` holds the package markers, sidecar, and filter signatures the stub imports
     or sits inside. Tracking them per stub is what lets a later run work out that removing
     the last stub in a directory also makes its ``__init__.py`` dead.
+
+    ``fixed_line`` marks a module whose contents came from a different template, so no line
+    of it corresponds to a line here. Every position in it reports at that one template line,
+    which is the ``{% extends %}`` or ``{% include %}`` tag that pulled the other file in.
     """
 
     template: PurePosixPath
     aligned: bool
     support: tuple[PurePosixPath, ...]
+    fixed_line: int | None = None
 
 
 @dataclass(frozen=True)
@@ -59,9 +64,21 @@ class Manifest:
         entry = self.entries.get(stub)
         return entry is not None and entry.aligned
 
+    def fixed_line(self, stub: PurePosixPath) -> int | None:
+        """The single template line a whole module reports at, or ``None`` for a normal stub."""
+        entry = self.entries.get(stub)
+        return None if entry is None else entry.fixed_line
+
     def stub_for(self, template: PurePosixPath) -> PurePosixPath | None:
-        """The stub a template generates, or ``None`` if it generates none."""
-        return next((stub for stub, entry in self.entries.items() if entry.template == template), None)
+        """The stub a template generates, or ``None`` if it generates none.
+
+        Skips a fixed-line module, because those hold another template's definitions and are
+        not the stub an editor should be watching for this one.
+        """
+        return next(
+            (stub for stub, entry in self.entries.items() if entry.template == template and entry.fixed_line is None),
+            None,
+        )
 
 
 def relative(path: Path, base: Path) -> PurePosixPath:
@@ -94,6 +111,7 @@ def _entries(payload: Any) -> dict[PurePosixPath, Entry]:
             template=PurePosixPath(str(raw['template'])),
             aligned=bool(raw.get('aligned', False)),
             support=tuple(PurePosixPath(str(item)) for item in raw.get('support', ())),
+            fixed_line=raw['fixed_line'] if isinstance(raw.get('fixed_line'), int) else None,
         )
         for stub, raw in stubs.items()
         if isinstance(raw, dict) and 'template' in raw
@@ -109,6 +127,7 @@ def dumps(man: Manifest) -> str:
                 'template': str(entry.template),
                 'aligned': entry.aligned,
                 'support': [str(path) for path in sorted(entry.support)],
+                **({} if entry.fixed_line is None else {'fixed_line': entry.fixed_line}),
             }
             for stub, entry in sorted(man.entries.items())
         },

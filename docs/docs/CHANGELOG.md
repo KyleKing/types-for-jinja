@@ -2,6 +2,7 @@
 
 ### Feat
 
+- **lsp**: resolve members through any Python language server
 - **nvim**: mirror stub diagnostics onto the template buffer
 - **lsp**: write stubs instead of running a checker
 - **cli**: add remap to name templates in checker output

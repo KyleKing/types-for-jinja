@@ -35,10 +35,17 @@ class LayoutError(Exception):
 
 @dataclass(frozen=True)
 class AlignedModule:
-    """A line-aligned stub plus the sidecar holding definitions from other templates."""
+    """A line-aligned stub plus the sidecar holding definitions from other templates.
+
+    ``sidecar_line`` is the template line the whole sidecar is attributed to, which is the
+    ``{% extends %}`` or ``{% include %}`` tag that pulled the other file in. A sidecar cannot
+    be line-aligned, because its statements come from a file with different line numbers, so
+    the local tag is the only position in this template that means anything.
+    """
 
     code: str
     sidecar: str
+    sidecar_line: int = 1
 
 
 def layout(module: GeneratedModule, header: TemplateHeader, sidecar_name: str) -> AlignedModule | None:
@@ -66,7 +73,11 @@ def _layout(module: GeneratedModule, header: TemplateHeader, sidecar_name: str) 
         *buckets.get(header.lineno, []),
     ]
     code = '\n'.join(_physical_line(buckets.get(lineno, [])) for lineno in range(1, max(buckets) + 1)) + '\n'
-    return AlignedModule(code=code, sidecar=_sidecar(preamble, foreign, header))
+    return AlignedModule(
+        code=code,
+        sidecar=_sidecar(preamble, foreign, header),
+        sidecar_line=min((line.lineno for line in foreign), default=header.lineno),
+    )
 
 
 def _sidecar(preamble: list[Line], foreign: list[Line], header: TemplateHeader) -> str:

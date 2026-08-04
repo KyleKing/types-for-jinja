@@ -1,12 +1,10 @@
 """The Jinja ``loop`` variable is defined inside a ``{% for %}`` body."""
 
-from pathlib import Path
+from . import checked
+from .checked import reported, write_template
+from .configuration import requires_checker
 
-from types_for_jinja.check import check_source
-
-from .configuration import requires_pyright
-
-pytestmark = requires_pyright
+pytestmark = requires_checker(checked.DEFAULT_BACKEND)
 
 _TEMPLATE = """{#def
 items: list[str]
@@ -15,7 +13,7 @@ items: list[str]
 """
 
 
-def test_loop_variable_is_defined(tmp_path):
-    diags = check_source(_TEMPLATE, Path('loop.html'), cache_dir=tmp_path)
+def test_loop_variable_is_defined(project):
+    template = write_template('templates/loop.html.jinja', _TEMPLATE)
 
-    assert diags == []
+    assert reported(template) == []

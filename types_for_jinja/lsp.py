@@ -52,7 +52,7 @@ def _to_lsp(diagnostic: Diagnostic) -> t.Diagnostic:
         range=t.Range(start=start, end=end),
         message=diagnostic.message,
         severity=severity,
-        code=diagnostic.rule or None,
+        code=diagnostic.reason or None,
         source='types-for-jinja',
     )
 

@@ -1,19 +1,16 @@
-"""The aligned stubs and their sidecars must be valid Python and line-aligned."""
+"""The aligned stubs and their sidecars must be valid Python and line-aligned.
+
+What a real checker makes of them is `tests/test_backends.py`, over every backend.
+"""
 
 import ast
-import json
-import shutil
-import subprocess  # ruff:ignore[suspicious-subprocess-import]
 from pathlib import Path
 
-from types_for_jinja.check import check_file
 from types_for_jinja.config import Config
-from types_for_jinja.generate import generate, write
+from types_for_jinja.generate import generate
 from types_for_jinja.header import parse_header
 from types_for_jinja.layout import layout
 from types_for_jinja.transpile import transpile
-
-from .configuration import requires_pyright
 
 _EXAMPLES = Path('examples')
 
@@ -41,35 +38,6 @@ def test_sidecar_binds_the_declared_context(tmp_path):
     assert sidecars
     for text in sidecars:
         assert 'current_route: str = _tj_any' in text or 'current_route' not in text
-
-
-@requires_pyright
-def test_generated_stubs_report_what_the_checker_reports(tmp_path):
-    """The bring-your-own-checker path must agree with `types-for-jinja check`."""
-    out_dir = tmp_path / 'stubs'
-    write(_generated(out_dir))
-    (out_dir / 'pyrightconfig.json').write_text(
-        json.dumps({'include': ['.'], 'extraPaths': [str(Path.cwd().resolve())]}),
-        encoding='utf-8',
-    )
-
-    result = subprocess.run(  # ruff:ignore[subprocess-without-shell-equals-true]
-        [shutil.which('pyright') or 'pyright', '--outputjson'],
-        cwd=out_dir,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    raw = json.loads(result.stdout)['generalDiagnostics']
-    reported = sorted(
-        (Path(entry['file']).name, entry['range']['start']['line'] + 1) for entry in raw if entry['severity'] == 'error'
-    )
-    template = Path('examples/templates/greeting_bad.html.jinja')
-    expected = sorted(
-        ('greeting_bad_html_jinja.py', diag.line) for diag in check_file(template, cache_dir=tmp_path / 'cache')
-    )
-
-    assert reported == expected
 
 
 def _aligned(source):

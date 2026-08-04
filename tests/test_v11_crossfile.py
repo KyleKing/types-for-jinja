@@ -1,100 +1,108 @@
-"""Cross-file checking: extends context flow and imported macros."""
+"""Cross-file checking: extends context flow and imported macros.
+
+A cross-file error is reported at the ``{% extends %}`` or ``{% include %}`` line of the file
+being checked, because the other file's own line numbers mean nothing here.
+"""
 
 from pathlib import Path
 
-from types_for_jinja.check import check_file, check_source
 from types_for_jinja.config import Config
 
-from .configuration import requires_pyright
+from . import checked
+from .backends import STUB_DIR
+from .checked import reported, write_template
+from .configuration import requires_checker
 
-pytestmark = requires_pyright
+pytestmark = requires_checker(checked.DEFAULT_BACKEND)
 
 _CROSSFILE = Path('examples/crossfile')
 _CONFIG = Config(
     imports=['from collections.abc import Callable'],
     globals=[('static_url', 'Callable[[str], str]'), ('current_route', 'str')],
     template_dirs=['examples/crossfile'],
+    out_dir=STUB_DIR,
 )
 
 
-def test_extends_child_clean(tmp_path):
-    assert check_file(_CROSSFILE / 'child.html.jinja', cache_dir=tmp_path) == []
+def test_extends_child_clean(examples_project):
+    assert reported(_CROSSFILE / 'child.html.jinja', _CONFIG) == []
 
 
-def test_extends_missing_base_context_errors(tmp_path):
-    child = """{#def
-message: str
-#}
-{% extends "base.html.jinja" %}
-{% block content %}<p>{{ message }}</p>{% endblock %}
-"""
-    diags = check_source(child, Path('bad.html.jinja'), cache_dir=tmp_path, config=_CONFIG)
+def test_extends_missing_base_context_errors(examples_project):
+    template = write_template(
+        'examples/crossfile/bad_child.html.jinja',
+        '{#def\nmessage: str\n#}\n{% extends "base.html.jinja" %}\n'
+        '{% block content %}<p>{{ message }}</p>{% endblock %}\n',
+    )
 
-    assert any(d.rule == 'reportUndefinedVariable' and 'page_heading' in d.message for d in diags)
+    found = reported(template, _CONFIG)
 
-
-def test_multi_level_extends_chain_is_clean(tmp_path):
-    assert check_file(_CROSSFILE / 'deep_child.html.jinja', cache_dir=tmp_path) == []
+    assert any(entry.mentions('page_heading') for entry in found)
 
 
-def test_multi_level_extends_reaches_the_grandparent_context(tmp_path):
-    """`page_heading` is declared two templates up, in base, not in mid."""
-    child = """{#def
-message: str
-#}
-{% extends "mid.html.jinja" %}
-"""
-    diags = check_source(child, Path('deep_bad.html.jinja'), cache_dir=tmp_path, config=_CONFIG)
-
-    assert any(d.rule == 'reportUndefinedVariable' and 'page_heading' in d.message for d in diags)
+def test_multi_level_extends_chain_is_clean(examples_project):
+    assert reported(_CROSSFILE / 'deep_child.html.jinja', _CONFIG) == []
 
 
-def test_include_clean(tmp_path):
-    assert check_file(_CROSSFILE / 'uses_include.html.jinja', cache_dir=tmp_path) == []
+def test_multi_level_extends_reaches_the_grandparent_context(examples_project):
+    """``page_heading`` is declared two templates up, in base, not in mid."""
+    template = write_template(
+        'examples/crossfile/deep_bad.html.jinja',
+        '{#def\nmessage: str\n#}\n{% extends "mid.html.jinja" %}\n',
+    )
+
+    found = reported(template, _CONFIG)
+
+    assert any(entry.mentions('page_heading') for entry in found)
 
 
-def test_include_missing_context_errors(tmp_path):
-    template = """{#def
-message: str
-#}
-<main>{% include "_sidebar.html.jinja" %}</main>
-"""
-    diags = check_source(template, Path('bad.html.jinja'), cache_dir=tmp_path, config=_CONFIG)
-
-    assert any(d.rule == 'reportUndefinedVariable' and 'page_heading' in d.message for d in diags)
+def test_include_clean(examples_project):
+    assert reported(_CROSSFILE / 'uses_include.html.jinja', _CONFIG) == []
 
 
-def test_cross_file_error_points_at_the_local_tag(tmp_path):
+def test_include_missing_context_errors(examples_project):
+    template = write_template(
+        'examples/crossfile/bad_include.html.jinja',
+        '{#def\nmessage: str\n#}\n<main>{% include "_sidebar.html.jinja" %}</main>\n',
+    )
+
+    found = reported(template, _CONFIG)
+
+    assert any(entry.mentions('page_heading') for entry in found)
+
+
+def test_cross_file_error_points_at_the_local_tag(examples_project):
     """The included file's own line numbers mean nothing in the file being checked."""
-    template = """{#def
-message: str
-#}
-<p>{{ message }}</p>
-<main>{% include "_sidebar.html.jinja" %}</main>
-"""
-    diags = check_source(template, Path('bad.html.jinja'), cache_dir=tmp_path, config=_CONFIG)
+    template = write_template(
+        'examples/crossfile/bad_line.html.jinja',
+        '{#def\nmessage: str\n#}\n<p>{{ message }}</p>\n<main>{% include "_sidebar.html.jinja" %}</main>\n',
+    )
 
-    assert [d.line for d in diags] == [5]
+    found = reported(template, _CONFIG)
 
-
-def test_include_cycle_terminates(tmp_path):
-    template = tmp_path / 'loop.html.jinja'
-    template.write_text('{#def\nx: str\n#}\n{{ x }}{% include "loop.html.jinja" %}\n', encoding='utf-8')
-
-    assert check_file(template, cache_dir=tmp_path) == []
+    assert [entry.line for entry in found] == [5]
 
 
-def test_from_import_clean(tmp_path):
-    assert check_file(_CROSSFILE / 'uses_macros.html.jinja', cache_dir=tmp_path) == []
+def test_include_cycle_terminates(project):
+    template = write_template(
+        'templates/loop.html.jinja',
+        '{#def\nx: str\n#}\n{{ x }}{% include "loop.html.jinja" %}\n',
+    )
+
+    assert reported(template, Config(template_dirs=['templates'], out_dir=STUB_DIR)) == []
 
 
-def test_from_import_wrong_arity_errors(tmp_path):
-    template = """{#def
-name: str
-#}
-{% from "macros.html.jinja" import field %}
-{{ field('only-one') }}
-"""
-    diags = check_source(template, Path('bad.html.jinja'), cache_dir=tmp_path, config=_CONFIG)
+def test_from_import_clean(examples_project):
+    assert reported(_CROSSFILE / 'uses_macros.html.jinja', _CONFIG) == []
 
-    assert any(d.rule == 'reportCallIssue' for d in diags)
+
+def test_from_import_wrong_arity_errors(examples_project):
+    """A macro called with too few arguments is a call error wherever the macro lives."""
+    template = write_template(
+        'examples/crossfile/bad_arity.html.jinja',
+        '{#def\nname: str\n#}\n{% from "macros.html.jinja" import field %}\n{{ field(\'only-one\') }}\n',
+    )
+
+    found = reported(template, _CONFIG)
+
+    assert [entry.line for entry in found] == [5]

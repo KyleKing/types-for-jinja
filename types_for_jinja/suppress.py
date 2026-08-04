@@ -1,25 +1,22 @@
-"""Drop diagnostics on template lines marked with an inline ignore comment.
+"""Carry a template's inline ignore comments into the generated stub.
 
-Supported forms, matched on the same source line as the flagged expression:
+Supported forms, matched on the same source line as the expression to silence:
 
-- ``{# type: ignore #}`` suppresses every diagnostic on that line
-- ``{# type: ignore[TJ002] #}`` suppresses only the listed codes (comma-separated)
+- ``{# type: ignore #}``
+- ``{# type: ignore[some-code] #}``
 
 The whitespace-control forms ``{#- ... -#}`` are handled too.
 
-``types-for-jinja check`` owns its diagnostics, so it honours the codes exactly. A
-generated stub cannot: it is read by whichever checker the project runs, each of which
-spells the same rule differently and reports the comment as an error when the name is one
-it does not know. So ``annotate`` emits a blanket ignore for the whole line in every
-style. ``STYLES`` maps a project's checker to the spelling it honours, and the portable
-default suits a project running more than one.
+A bracketed code is read but not carried across, and the emitted comment is always a
+blanket ignore for the whole generated line. The stub is read by whichever checker the
+project runs, each spells the same rule differently, and a name one of them does not know
+is itself reported as an error. ``STYLES`` maps a project's checker to the spelling it
+honours, and the portable default suits a project running more than one.
 """
 
 from __future__ import annotations
 
 import re
-
-from types_for_jinja.diagnostic import Diagnostic
 
 _IGNORE_RE = re.compile(r'\{#-?\s*type:\s*ignore(?:\[(?P<codes>[^\]]*)\])?\s*-?#\}')
 _MARKER_RE = re.compile(r'#\s*L(\d+)\s*$')
@@ -30,14 +27,6 @@ STYLES: dict[str, str] = {
     'pyright': '# pyright: ignore',
     'ty': '# ty: ignore',
 }
-
-
-def apply_suppressions(source: str, diags: list[Diagnostic]) -> list[Diagnostic]:
-    """Remove diagnostics suppressed by an inline ignore comment on the same line."""
-    ignores = _collect_ignores(source)
-    if not ignores:
-        return diags
-    return [diag for diag in diags if not _suppressed(diag, ignores)]
 
 
 def annotate(code: str, source: str, style: str, *, aligned: bool) -> str:
@@ -77,19 +66,5 @@ def _marked_line(text: str) -> int | None:
     return int(match.group(1)) if match else None
 
 
-def _collect_ignores(source: str) -> dict[int, frozenset[str] | None]:
-    ignores: dict[int, frozenset[str] | None] = {}
-    for lineno, line in enumerate(source.splitlines(), start=1):
-        match = _IGNORE_RE.search(line)
-        if match is None:
-            continue
-        spec = match.group('codes')
-        ignores[lineno] = None if spec is None else frozenset(c.strip() for c in spec.split(',') if c.strip())
-    return ignores
-
-
-def _suppressed(diag: Diagnostic, ignores: dict[int, frozenset[str] | None]) -> bool:
-    if diag.line not in ignores:
-        return False
-    codes = ignores[diag.line]
-    return codes is None or diag.code in codes
+def _collect_ignores(source: str) -> set[int]:
+    return {lineno for lineno, line in enumerate(source.splitlines(), start=1) if _IGNORE_RE.search(line)}

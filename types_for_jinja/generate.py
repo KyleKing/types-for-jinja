@@ -35,12 +35,20 @@ _SIDECAR_SUFFIX = '_tj_shared'
 
 @dataclass(frozen=True)
 class Stub:
-    """One template's generated stub and how faithfully it maps back to the template."""
+    """One template's generated stub and how faithfully it maps back to the template.
+
+    ``sidecar`` names the module holding definitions this template pulled in from another
+    file, with ``sidecar_line`` the local ``{% extends %}`` or ``{% include %}`` tag those
+    definitions are attributed to. Without that pairing, a cross-file error would report
+    against a generated path with no template attached to it at all.
+    """
 
     template: Path
     path: Path
     files: dict[Path, str]
     aligned: bool
+    sidecar: Path | None = None
+    sidecar_line: int = 1
 
 
 @dataclass(frozen=True)
@@ -155,16 +163,23 @@ def _manifest(generated: Generated) -> manifest.Manifest:
     root = Path.cwd()
     out_dir = generated.out_dir
     shared = manifest.relative(_filter_module(out_dir), out_dir)
-    return manifest.Manifest(
-        entries={
-            manifest.relative(stub.path, out_dir): manifest.Entry(
-                template=manifest.relative(stub.template, root),
-                aligned=stub.aligned,
-                support=(shared, *sorted(manifest.relative(path, out_dir) for path in stub.files if path != stub.path)),
+    entries: dict[PurePosixPath, manifest.Entry] = {}
+    for stub in generated.stubs:
+        template = manifest.relative(stub.template, root)
+        support = sorted(manifest.relative(path, out_dir) for path in stub.files if path != stub.path)
+        entries[manifest.relative(stub.path, out_dir)] = manifest.Entry(
+            template=template,
+            aligned=stub.aligned,
+            support=(shared, *support),
+        )
+        if stub.sidecar is not None:
+            entries[manifest.relative(stub.sidecar, out_dir)] = manifest.Entry(
+                template=template,
+                aligned=False,
+                support=(shared,),
+                fixed_line=stub.sidecar_line,
             )
-            for stub in generated.stubs
-        },
-    )
+    return manifest.Manifest(entries=entries)
 
 
 def _filter_module(out_dir: Path) -> Path:
@@ -201,6 +216,14 @@ def _stub_for(template: Path, out_dir: Path, config: Config, override: str | Non
         return Stub(template=template, path=stub_path, files=marker_files, aligned=False)
     code = annotate(aligned.code, source, config.suppression, aligned=True)
     files = {stub_path: code, **package_markers(out_dir, stub_path)}
-    if aligned.sidecar:
-        files[out_dir / f'{shared}.py'] = aligned.sidecar
-    return Stub(template=template, path=stub_path, files=files, aligned=True)
+    sidecar = out_dir / f'{shared}.py' if aligned.sidecar else None
+    if sidecar is not None:
+        files[sidecar] = aligned.sidecar
+    return Stub(
+        template=template,
+        path=stub_path,
+        files=files,
+        aligned=True,
+        sidecar=sidecar,
+        sidecar_line=aligned.sidecar_line,
+    )

@@ -19,8 +19,6 @@ def requires_checker(name: str) -> pytest.MarkDecorator:
     )
 
 
-requires_pyright = requires_checker('pyright')
-
 TEST_DIR = Path(__file__).resolve().parent
 """Path to the `test` directory that contains this file and all other tests."""
 

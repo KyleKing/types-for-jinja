@@ -76,6 +76,9 @@ class Remapper:
         template = self._manifest.template_for(key)
         if template is None:
             return None
+        fixed = self._manifest.fixed_line(key)
+        if fixed is not None:
+            return Location(path=template, line=fixed, column=1)
         stub_lines = self._lines(self._out_dir / key)
         template_line = line if self._manifest.aligned(key) else _marked_line(stub_lines, line)
         if template_line is None:
