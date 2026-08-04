@@ -4,7 +4,7 @@ from pathlib import Path
 
 from types_for_jinja.complete import cursor_context
 from types_for_jinja.config import Config, Syntax, load_config
-from types_for_jinja.header import parse_header
+from types_for_jinja.header import Param, parse_header
 from types_for_jinja.resolve import search_paths
 
 from . import checked
@@ -33,7 +33,7 @@ def test_header_is_read_through_custom_comment_delimiters():
     header = parse_header(_TEMPLATE, _SQUARE)
 
     assert header is not None
-    assert header.params == [('user', 'User')]
+    assert header.params == [Param('user', 'User')]
 
 
 def test_standard_delimiters_do_not_match_a_custom_header():

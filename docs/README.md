@@ -76,6 +76,14 @@ A macro takes its own `{#def #}` block, which types its parameters for both its 
 
 Without that block the parameters stay untyped and only arity is checked.
 
+JinjaX writes the whole context on one line, with commas between, defaults allowed, and untyped names allowed. Both spellings parse, and they can be mixed:
+
+```jinja
+{#def action, method: str = "post", count: int = 0 #}
+```
+
+A name with no annotation is `Any`, so it is declared without being constrained. A default is carried into the generated wrapper's signature, so callers do not have to repeat it.
+
 Jinja's built-in filters carry their return type, so a filtered expression is still checked: `{{ items | length }}` is an `int`, and `{% for x in items | sort %}` still knows what `x` is. Only the return type is pinned, because a filter catalog that guesses at argument types reports errors on correct templates. A filter the catalog does not know (yours, or one from an extension) falls back to `Any`.
 
 ## Installation

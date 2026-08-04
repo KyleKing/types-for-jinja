@@ -32,6 +32,9 @@ _CMP_OPS = {
 }
 
 
+_ANY = '_TJAny'
+"""What an untyped header name is annotated as; the preamble imports ``Any`` under this alias."""
+
 MacroTypes = dict[int, dict[str, str]]
 """Declared parameter types for each ``{% macro %}``, keyed by the macro's line number."""
 
@@ -68,7 +71,7 @@ def macro_defs(source: str, tree: nodes.Template, syntax: Syntax | None = None) 
         )
         if owner is None:
             continue
-        types[owner.lineno] = dict(block.params)
+        types[owner.lineno] = {param.name: param.annotation or _ANY for param in block.params}
         imports.extend(block.imports)
     return types, imports
 
@@ -160,7 +163,7 @@ def transpile(
     lines.extend(split.foreign_defs)
     lines.extend(split.module_defs)
 
-    signature = ', '.join(f'{name}: {type_str}' for name, type_str in header.params)
+    signature = ', '.join(param.annotated(_ANY) for param in header.params)
     lines.append(Line(0, f'def _render({signature}) -> None:', header.lineno))
     body: list[Line] = []
     _emit_body(split.render_nodes, body, 1, ctx)
@@ -173,7 +176,7 @@ def transpile(
     code = '\n'.join(_render_line(line) for line in lines) + '\n'
     return GeneratedModule(
         code=code,
-        param_names=[name for name, _ in header.params],
+        param_names=[param.name for param in header.params],
         lines=lines,
         preamble_len=preamble_len,
     )
@@ -216,7 +219,7 @@ def _split_top_level(tree: nodes.Template, ctx: _Emit) -> _TopLevel:
 
 
 def _preamble(header: TemplateHeader, config: Config, extra_imports: list[str]) -> list[Line]:
-    param_names = {name for name, _ in header.params}
+    param_names = {param.name for param in header.params}
     declared = _unique([*header.imports, *config.imports, *extra_imports])
     lines = [Line(0, imp, header.lineno) for imp in declared]
     lines.extend(

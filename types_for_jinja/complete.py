@@ -107,8 +107,8 @@ def context_names(
     when no repair of ``source`` parses, only the header and configured globals come back.
     """
     config = config or Config()
-    param_names = {name for name, _ in header.params}
-    found = [ContextName(name, type_str, 'parameter') for name, type_str in header.params]
+    param_names = {param.name for param in header.params}
+    found = [ContextName(param.name, param.annotation or 'Any', 'parameter') for param in header.params]
     found.extend(ContextName(name, type_str, 'global') for name, type_str in config.globals if name not in param_names)
     tree = _parse_tolerantly(source, line, config.syntax)
     if tree is not None:

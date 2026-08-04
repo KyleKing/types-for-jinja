@@ -80,7 +80,7 @@ uv publish
 | `types_for_jinja/emit.py`                      | 34         | 0       | 0        | 100.0%   |
 | `types_for_jinja/filters.py`                   | 19         | 0       | 0        | 100.0%   |
 | `types_for_jinja/generate.py`                  | 128        | 3       | 0        | 97.4%    |
-| `types_for_jinja/header.py`                    | 52         | 0       | 0        | 98.4%    |
+| `types_for_jinja/header.py`                    | 75         | 0       | 2        | 100.0%   |
 | `types_for_jinja/layout.py`                    | 175        | 11      | 0        | 89.4%    |
 | `types_for_jinja/lsp.py`                       | 210        | 29      | 0        | 81.2%    |
 | `types_for_jinja/manifest.py`                  | 62         | 1       | 0        | 97.1%    |
@@ -88,9 +88,9 @@ uv publish
 | `types_for_jinja/remap.py`                     | 248        | 17      | 0        | 89.0%    |
 | `types_for_jinja/resolve.py`                   | 21         | 2       | 0        | 92.6%    |
 | `types_for_jinja/suppress.py`                  | 26         | 0       | 0        | 100.0%   |
-| `types_for_jinja/transpile.py`                 | 408        | 64      | 0        | 81.9%    |
-| `types_for_jinja/wrapper.py`                   | 85         | 2       | 0        | 96.3%    |
-| **Totals**                                     | 1992       | 169     | 37       | 88.6%    |
+| `types_for_jinja/transpile.py`                 | 410        | 64      | 0        | 82.0%    |
+| `types_for_jinja/wrapper.py`                   | 92         | 2       | 0        | 96.6%    |
+| **Totals**                                     | 2024       | 169     | 39       | 88.8%    |
 
 Generated on: 2026-08-04
 <!-- {cte} -->

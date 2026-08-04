@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from types_for_jinja.header import parse_header
+from types_for_jinja.header import Param, parse_header
 from types_for_jinja.transpile import transpile
 
 from . import checked
@@ -18,7 +18,7 @@ def test_parse_header_reads_imports_and_params():
 
     assert header is not None
     assert header.imports == ['from examples.models import User']
-    assert header.params == [('user', 'User')]
+    assert header.params == [Param('user', 'User')]
 
 
 def test_parse_header_absent_returns_none():

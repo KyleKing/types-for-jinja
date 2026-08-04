@@ -16,7 +16,7 @@ from collections import defaultdict
 from dataclasses import dataclass, replace
 
 from types_for_jinja.header import TemplateHeader
-from types_for_jinja.transpile import GeneratedModule, Line
+from types_for_jinja.transpile import _ANY, GeneratedModule, Line
 
 _LOOP_BINDING = 'loop = _tj_loop'
 _SCAFFOLD = (
@@ -136,7 +136,7 @@ def _flatten_preamble(preamble: list[Line], header: TemplateHeader) -> list[Line
     texts = [line.text for line in preamble if _is_import(line.text) and 'as _TJAny' not in line.text]
     texts.extend(_SCAFFOLD)
     texts.extend(_bind(line.text) for line in preamble if not _is_import(line.text) and not _is_scaffold(line.text))
-    texts.extend(_bind(f'{name}: {type_str}') for name, type_str in header.params)
+    texts.extend(_bind(param.annotated(_ANY)) for param in header.params)
     return [Line(0, text, header.lineno) for text in texts]
 
 

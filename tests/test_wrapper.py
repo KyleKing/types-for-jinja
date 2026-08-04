@@ -105,3 +105,42 @@ def test_pydantic_wrapper_coerces_and_rejects():
 
     with pytest.raises(ValidationError):
         wrapper_pydantic.render_profile(profile=cast('Profile', {'name': 'Bo', 'email': 'bo@x.io'}))
+
+
+_JINJAX = '{#def action, method: str = "post", count: int = 0 #}\n<form>{{ action }}</form>\n'
+
+
+def _jinjax_header():
+    header = parse_header(_JINJAX)
+    assert header is not None
+    return header
+
+
+def test_a_jinjax_header_carries_its_defaults_into_the_signature():
+    """A default declared in the template belongs in the wrapper, or every call must repeat it."""
+    source = generate_wrapper(_jinjax_header(), 'form.html.jinja')
+
+    ast.parse(source)
+    assert "def render_form(*, action: Any, method: str = 'post', count: int = 0) -> Markup:" in source
+
+
+def test_an_untyped_name_becomes_Any_with_the_import_it_needs():  # noqa: N802
+    source = generate_wrapper(_jinjax_header(), 'form.html.jinja')
+
+    assert 'from typing import Any' in source
+    ast.parse(source)
+
+
+def test_a_fully_typed_header_does_not_import_Any():  # noqa: N802
+    """The import is only correct when something needs it, and an unused one is a lint failure."""
+    source = generate_wrapper(_header(), 'profile.html.jinja')
+
+    assert 'from typing import Any' not in source
+
+
+def test_a_default_survives_the_pydantic_validator():
+    source = generate_wrapper(_jinjax_header(), 'form.html.jinja', validator='pydantic')
+
+    ast.parse(source)
+    assert '_ta_method = TypeAdapter(str)' in source
+    assert '_ta_action = TypeAdapter(Any)' in source
