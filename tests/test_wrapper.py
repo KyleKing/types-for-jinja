@@ -10,8 +10,9 @@ from pydantic import ValidationError
 
 from examples.runtime import wrapper_beartype, wrapper_pydantic
 from examples.runtime.models import Profile
+from types_for_jinja.config import Config, WrapperConfig
 from types_for_jinja.header import parse_header
-from types_for_jinja.wrapper import generate_wrapper
+from types_for_jinja.wrapper import ReturnStyle, build_wrappers, generate_wrapper, template_name
 
 _TEMPLATE = Path('examples/runtime/templates/profile.html.jinja')
 
@@ -28,6 +29,65 @@ def test_generated_source_is_well_formed(validator):
 
     ast.parse(source)
     assert 'def render_profile(*, profile: Profile) -> Markup:' in source
+
+
+def test_return_type_swaps_the_annotation_and_the_call():
+    style = ReturnStyle('HTMLResponse', 'from starlette.responses import HTMLResponse')
+
+    source = generate_wrapper(_header(), 'profile.html.jinja', returns=style)
+
+    ast.parse(source)
+    assert 'from starlette.responses import HTMLResponse' in source
+    assert 'def render_profile(*, profile: Profile) -> HTMLResponse:' in source
+    assert 'return HTMLResponse(_env.get_template' in source
+    assert 'Markup' not in source
+
+
+def test_build_wrappers_mirrors_the_template_tree(tmp_path):
+    wrappers = build_wrappers([_TEMPLATE], tmp_path, Config())
+
+    generated = tmp_path / 'examples/runtime/templates/profile_html_jinja.py'
+    assert wrappers.skipped == []
+    assert generated in wrappers.files
+    assert tmp_path / 'examples/runtime/__init__.py' in wrappers.files
+
+
+def test_build_wrappers_reads_the_project_config(tmp_path):
+    config = Config(
+        template_dirs=['examples/runtime/templates'],
+        wrapper=WrapperConfig(
+            env_import='from examples.runtime.env import env as _env',
+            validator='beartype',
+        ),
+    )
+
+    source = next(text for path, text in build_wrappers([_TEMPLATE], tmp_path, config).files.items() if path.suffix)
+
+    assert '@beartype' in source
+    assert 'from examples.runtime.env import env as _env' in source
+
+
+def test_template_name_is_relative_to_the_configured_template_dir():
+    config = Config(template_dirs=['examples/runtime/templates'])
+
+    assert template_name(_TEMPLATE, config) == 'profile.html.jinja'
+
+
+def test_headerless_template_is_skipped(tmp_path):
+    template = tmp_path / 'plain.html.jinja'
+    template.write_text('<p>no header</p>\n', encoding='utf-8')
+
+    wrappers = build_wrappers([template], tmp_path / 'out', Config())
+
+    assert wrappers.files == {}
+    assert 'no {#def ... #} type header' in wrappers.skipped[0][1]
+
+
+def test_unknown_validator_is_rejected(tmp_path):
+    config = Config(wrapper=WrapperConfig(validator='mypy'))
+
+    with pytest.raises(ValueError, match='unknown validator'):
+        build_wrappers([_TEMPLATE], tmp_path, config)
 
 
 def test_beartype_wrapper_renders_and_guards():

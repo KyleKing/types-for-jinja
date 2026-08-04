@@ -9,12 +9,76 @@ either a ``@beartype`` guard (check, non-transforming) or a Pydantic ``TypeAdapt
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from types_for_jinja.header import TemplateHeader
+from types_for_jinja.config import Config, WrapperConfig, load_config
+from types_for_jinja.emit import mirrored_path, package_markers
+from types_for_jinja.header import TemplateHeader, header_errors, parse_header
 
 Validator = Literal['none', 'beartype', 'pydantic']
+VALIDATORS: tuple[Validator, ...] = ('none', 'beartype', 'pydantic')
+
+
+@dataclass(frozen=True)
+class ReturnStyle:
+    """What the generated function returns, and the import that names it."""
+
+    type_name: str = 'Markup'
+    import_line: str = 'from markupsafe import Markup'
+
+
+@dataclass(frozen=True)
+class Wrappers:
+    """The wrapper modules a run would write, plus the templates that produced none."""
+
+    files: dict[Path, str]
+    skipped: list[tuple[Path, str]]
+
+
+def build_wrappers(templates: list[Path], out_dir: Path, config: Config | None = None) -> Wrappers:
+    """Generate a typed render wrapper per template, laid out under ``out_dir``."""
+    resolved = config or load_config(Path.cwd())
+    files: dict[Path, str] = {}
+    skipped: list[tuple[Path, str]] = []
+    for template in templates:
+        source = template.read_text(encoding='utf-8')
+        header = parse_header(source)
+        if header is None:
+            skipped.append((template, 'no {#def ... #} type header'))
+            continue
+        malformed = header_errors(header)
+        if malformed:
+            skipped.append((template, malformed[0]))
+            continue
+        path = mirrored_path(template, out_dir)
+        files[path] = generate_wrapper(
+            header,
+            template_name(template, resolved),
+            validator=_validator(resolved.wrapper),
+            env_import=resolved.wrapper.env_import,
+            returns=ReturnStyle(resolved.wrapper.return_type, resolved.wrapper.return_import),
+        )
+        files.update(package_markers(out_dir, path))
+    return Wrappers(files=files, skipped=skipped)
+
+
+def template_name(template: Path, config: Config) -> str:
+    """Return the name Jinja's loader uses, relative to the first configured template dir."""
+    for directory in config.template_dirs:
+        root = Path(directory).resolve()
+        candidate = template.resolve()
+        if root in candidate.parents:
+            return candidate.relative_to(root).as_posix()
+    return template.name
+
+
+def _validator(wrapper: WrapperConfig) -> Validator:
+    if wrapper.validator not in VALIDATORS:
+        message = f'unknown validator {wrapper.validator!r}; expected one of {", ".join(VALIDATORS)}'
+        raise ValueError(message)
+    return wrapper.validator
 
 
 def generate_wrapper(
@@ -24,15 +88,18 @@ def generate_wrapper(
     validator: Validator = 'none',
     env_import: str | None = None,
     func_name: str | None = None,
+    returns: ReturnStyle | None = None,
 ) -> str:
     """Return Python source for a typed render wrapper around ``template_name``.
 
     ``env_import`` supplies the Jinja Environment as ``_env`` (for example
     ``from myapp.templating import env as _env``). When omitted, the module declares
     ``_env: Environment`` for the caller to assign. ``validator`` selects Level-2
-    runtime enforcement. Imports are emitted in a stable order; run a formatter over
-    the output if your project sorts imports.
+    runtime enforcement. ``returns`` swaps the default ``Markup`` for a framework
+    response class. Imports are emitted in a stable order; run a formatter over the
+    output if your project sorts imports.
     """
+    style = returns or ReturnStyle()
     name = func_name or _slug(template_name)
     signature = ', '.join(f'{param}: {type_str}' for param, type_str in header.params)
     call_kwargs = ', '.join(f'{param}={param}' for param, _ in header.params)
@@ -42,7 +109,7 @@ def generate_wrapper(
         '',
         'from __future__ import annotations',
         '',
-        *_module_imports(header, validator, env_import),
+        *_module_imports(header, validator, env_import, style),
     ]
     lines.extend(_module_globals(header, validator, env_import))
     lines.extend(['', ''])
@@ -50,7 +117,7 @@ def generate_wrapper(
         lines.append('@beartype')
     lines.extend(
         [
-            f'def render_{name}(*, {signature}) -> Markup:',
+            f'def render_{name}(*, {signature}) -> {style.type_name}:',
             f'    """Render {template_name} with a checked context."""',
         ]
     )
@@ -60,14 +127,20 @@ def generate_wrapper(
             for param, _ in header.params
         )
     render = f'_env.get_template({template_name!r}).render({call_kwargs})'
-    lines.append(f'    return Markup({render})  # ruff:ignore[unsafe-markup-use]')
+    suppress = '  # ruff:ignore[unsafe-markup-use]' if style.type_name == 'Markup' else ''
+    lines.append(f'    return {style.type_name}({render}){suppress}')
     return '\n'.join(lines) + '\n'
 
 
-def _module_imports(header: TemplateHeader, validator: Validator, env_import: str | None) -> list[str]:
+def _module_imports(
+    header: TemplateHeader,
+    validator: Validator,
+    env_import: str | None,
+    style: ReturnStyle,
+) -> list[str]:
     imports = list(header.imports)
     env_line = env_import if env_import is not None else 'from jinja2 import Environment'
-    imports.extend(['from markupsafe import Markup', env_line])
+    imports.extend([style.import_line, env_line])
     if validator == 'beartype':
         imports.append('from beartype import beartype')
     if validator == 'pydantic':

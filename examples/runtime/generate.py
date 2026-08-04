@@ -3,6 +3,9 @@
 Run with ``uv run python -m examples.runtime.generate``. The output files
 (``wrapper_beartype.py`` and ``wrapper_pydantic.py``) are committed so the example
 reads without a build step.
+
+``types-for-jinja wrapper`` is the supported way to do this in a project. This script
+exists to show both validators side by side, which one CLI run cannot.
 """
 
 from __future__ import annotations

@@ -12,15 +12,12 @@ Open items, priority order.
    which a Fleet run on another machine can't resolve. _commit is already
    5.0.3, so this is a one-line change.
 
-3. Open design question, after publish: yak-shears hand-writes 7 render_*
-   functions that restate the parameter list their template's {#def ... #}
-   header already declares, the same signature generate_wrapper would emit.
-   The blocker is that generate_wrapper returns Markup while yak-shears'
-   helpers return starlette.responses.HTMLResponse (and render_error also
-   sets an HTTPStatus), and some helpers do real work before rendering.
-   Decide whether types-for-jinja grows a "wrap the render in a
-   caller-supplied callable" option, or yak-shears keeps its helpers and only
-   generates the inner typed render.
+3. After publish: point yak-shears at `types-for-jinja wrapper` and delete the
+   7 hand-written render_* functions that restate their template's
+   {#def ... #} header. The return-type blocker is gone; set
+   return_type = "HTMLResponse" in [tool.types_for_jinja.wrapper]. render_error
+   also sets an HTTPStatus, so that one stays hand-written and calls the
+   generated function for the render.
 
 Done, for the record: the git remote points at the renamed repo
 (KyleKing/types-for-jinja).

@@ -4,13 +4,21 @@ from __future__ import annotations
 
 import argparse
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 from types_for_jinja.check import Diagnostic, PyrightNotFoundError, check_file
+from types_for_jinja.config import Config, load_config
+from types_for_jinja.emit import stale_files, write_files
 from types_for_jinja.generate import generate, stale, write
 from types_for_jinja.report import format_json, format_sarif, format_text
+from types_for_jinja.wrapper import VALIDATORS, build_wrappers
 
 _FORMATTERS = {'text': format_text, 'json': format_json, 'sarif': format_sarif}
+
+
+def _warn(message: str) -> None:
+    print(f'types-for-jinja: {message}', file=sys.stderr)  # ruff:ignore[print]
 
 
 def _iter_templates(paths: list[Path]) -> list[Path]:
@@ -27,19 +35,46 @@ def _iter_templates(paths: list[Path]) -> list[Path]:
 def _generate(templates: list[Path], out_dir: Path, *, check_only: bool) -> int:
     generated = generate(templates, out_dir)
     for template, reason in generated.skipped:
-        print(f'types-for-jinja: skipped {template}: {reason}', file=sys.stderr)  # ruff:ignore[print]
+        _warn(f'skipped {template}: {reason}')
     for template in generated.unaligned:
-        message = f'types-for-jinja: {template} has no line-aligned form; its stub uses # L markers instead'
-        print(message, file=sys.stderr)  # ruff:ignore[print]
+        _warn(f'{template} has no line-aligned form; its stub uses # L markers instead')
     if check_only:
         outdated = stale(generated)
         for path in outdated:
-            print(f'types-for-jinja: out of date: {path}', file=sys.stderr)  # ruff:ignore[print]
+            _warn(f'out of date: {path}')
         return 1 if outdated else 0
-    changed = write(generated, out_dir)
-    summary = f'Wrote {len(changed)} of {len(generated.files)} stub(s) for {len(generated.stubs)} template(s)'
-    print(summary, file=sys.stderr)  # ruff:ignore[print]
+    changed = write(generated)
+    _warn(f'Wrote {len(changed)} of {len(generated.files)} stub(s) for {len(generated.stubs)} template(s)')
     return 0
+
+
+def _wrapper(templates: list[Path], config: Config, out_dir: Path, *, check_only: bool) -> int:
+    wrappers = build_wrappers(templates, out_dir, config)
+    for template, reason in wrappers.skipped:
+        _warn(f'skipped {template}: {reason}')
+    if check_only:
+        outdated = stale_files(wrappers.files)
+        for path in outdated:
+            _warn(f'out of date: {path}')
+        return 1 if outdated else 0
+    changed = write_files(wrappers.files)
+    _warn(f'Wrote {len(changed)} of {len(wrappers.files)} wrapper file(s)')
+    return 0
+
+
+def _wrapper_config(args: argparse.Namespace, config: Config) -> Config:
+    """Let explicit flags win over ``[tool.types_for_jinja.wrapper]``."""
+    overrides = {
+        key: value
+        for key, value in (
+            ('env_import', args.env_import),
+            ('return_import', args.return_import),
+            ('return_type', args.return_type),
+            ('validator', args.validator),
+        )
+        if value is not None
+    }
+    return replace(config, wrapper=replace(config.wrapper, **overrides))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -66,11 +101,39 @@ def main(argv: list[str] | None = None) -> int:
         action='store_true',
         help='exit non-zero if any stub is missing or out of date instead of writing',
     )
+    wrapper_parser = subparsers.add_parser(
+        'wrapper',
+        help='write a typed render function per template, so the render call site is checked too',
+    )
+    wrapper_parser.add_argument('paths', nargs='+', type=Path, help='template files or directories')
+    wrapper_parser.add_argument('-o', '--out-dir', type=Path, default=None, help='output directory')
+    wrapper_parser.add_argument(
+        '--validator',
+        choices=list(VALIDATORS),
+        default=None,
+        help='runtime enforcement to apply to the context (default: none, static only)',
+    )
+    wrapper_parser.add_argument(
+        '--env-import',
+        default=None,
+        help="import binding your Jinja Environment to _env, e.g. 'from myapp.templating import env as _env'",
+    )
+    wrapper_parser.add_argument('--return-type', default=None, help='type the wrapper returns (default: Markup)')
+    wrapper_parser.add_argument('--return-import', default=None, help='import that names --return-type')
+    wrapper_parser.add_argument(
+        '--check',
+        action='store_true',
+        help='exit non-zero if any wrapper is missing or out of date instead of writing',
+    )
     args = parser.parse_args(argv)
 
     templates = _iter_templates(args.paths)
     if args.command == 'generate':
         return _generate(templates, args.out_dir, check_only=args.check)
+    if args.command == 'wrapper':
+        config = _wrapper_config(args, load_config(Path.cwd()))
+        out_dir = args.out_dir or Path(config.wrapper.out_dir)
+        return _wrapper(templates, config, out_dir, check_only=args.check)
     try:
         diagnostics: list[Diagnostic] = [diag for template in templates for diag in check_file(template)]
     except PyrightNotFoundError:

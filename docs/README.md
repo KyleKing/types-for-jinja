@@ -48,9 +48,52 @@ uv add types-for-jinja      # or: pip install types-for-jinja
 
 `types-for-jinja check --format json` and `--format sarif` emit machine-readable output for CI. The SARIF report plugs into GitHub code scanning and coding agents. A pre-commit hook and an LSP (with a Neovim integration in `editors/nvim`) deliver the same diagnostics to commits and editors.
 
-## Runtime checking (optional)
+## Typed render calls (optional)
 
-Static checking is the default and costs nothing at runtime. To also validate the context at render time, `types-for-jinja` can generate a typed wrapper and enforce the types with [beartype](https://github.com/beartype/beartype) (check) or [Pydantic](https://github.com/pydantic/pydantic) (parse and coerce). Both work whether your context types are dataclasses or Pydantic models. A runnable proof lives in `examples/runtime`.
+`check` types the inside of a template. `types-for-jinja wrapper` types the call site, so `render_profile(porfile=...)` fails pyright the same way a typo in the template body does:
+
+```console
+$ types-for-jinja wrapper templates/ -o myapp/_render \
+    --env-import 'from myapp.templating import env as _env'
+types-for-jinja: Wrote 3 of 3 wrapper file(s)
+```
+
+Each template gets one function whose signature is its `{#def #}` header, and whose body calls Jinja unchanged:
+
+```python
+@beartype
+def render_profile(*, profile: Profile) -> Markup:
+    """Render profile.html.jinja with a checked context."""
+    return Markup(_env.get_template('profile.html.jinja').render(profile=profile))
+```
+
+Set the options once in `pyproject.toml` instead of passing them every run:
+
+```toml
+[tool.types_for_jinja]
+template_dirs = ["myapp/templates"]
+
+[tool.types_for_jinja.wrapper]
+env_import = "from myapp.templating import env as _env"
+out_dir = "myapp/_render"
+validator = "beartype"
+```
+
+`template_dirs` is what makes the generated `get_template()` argument match the name your loader uses. Run `types-for-jinja wrapper --check` in CI or a pre-commit hook to fail when a generated wrapper no longer matches its template.
+
+Web apps usually return a response rather than `Markup`. Point `--return-type` and `--return-import` (or `return_type` and `return_import` in the config) at your framework's class and the wrapper calls it instead:
+
+```python
+def render_profile(*, profile: Profile) -> HTMLResponse:
+    """Render profile.html.jinja with a checked context."""
+    return HTMLResponse(_env.get_template('profile.html.jinja').render(profile=profile))
+```
+
+A helper that does real work before rendering, or sets a status code, stays hand-written and calls the generated function for the render itself.
+
+### Runtime checking
+
+`--validator` adds render-time enforcement on top: [beartype](https://github.com/beartype/beartype) checks the value against the annotation and raises, [Pydantic](https://github.com/pydantic/pydantic) parses and coerces it through a `TypeAdapter`. Both work whether your context types are dataclasses or Pydantic models. The default is `none`, because the static check costs nothing at runtime. Pydantic can hand the template a new coerced object, so the value you pass is not always the value rendered; beartype leaves the object alone. A runnable proof of both lives in `examples/runtime`.
 
 ## Scope
 

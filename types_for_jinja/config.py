@@ -3,8 +3,25 @@
 from __future__ import annotations
 
 import tomllib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from pathlib import Path
+
+
+@dataclass(frozen=True)
+class WrapperConfig:
+    """How ``types-for-jinja wrapper`` shapes the typed render functions it generates.
+
+    ``return_type`` is called on the rendered string, so a framework response class
+    (``HTMLResponse``) drops in where ``Markup`` sits by default. ``env_import`` must bind
+    the project's Jinja Environment to ``_env``; without it the module declares
+    ``_env: Environment`` for the caller to assign.
+    """
+
+    env_import: str | None = None
+    out_dir: str = '_jinja_wrappers'
+    return_import: str = 'from markupsafe import Markup'
+    return_type: str = 'Markup'
+    validator: str = 'none'
 
 
 @dataclass(frozen=True)
@@ -14,6 +31,7 @@ class Config:
     imports: list[str] = field(default_factory=list)
     globals: list[tuple[str, str]] = field(default_factory=list)
     template_dirs: list[str] = field(default_factory=list)
+    wrapper: WrapperConfig = field(default_factory=WrapperConfig)
 
 
 def load_config(root: Path) -> Config:
@@ -29,4 +47,10 @@ def load_config(root: Path) -> Config:
         imports=list(table.get('imports', [])),
         globals=[(name, type_str) for name, type_str in declared.items()],
         template_dirs=list(table.get('template_dirs', [])),
+        wrapper=_wrapper_config(table.get('wrapper', {})),
     )
+
+
+def _wrapper_config(table: dict[str, str]) -> WrapperConfig:
+    known = {field_.name for field_ in fields(WrapperConfig)}
+    return WrapperConfig(**{key: value for key, value in table.items() if key in known})
