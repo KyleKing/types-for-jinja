@@ -198,8 +198,8 @@ Ruled out entirely, per "Scope boundary": Ansible, Salt, and dbt; engines not ho
 
 ## Validation targets
 
-1. A tiny standalone example in `examples/` (fastest proof the mechanism works).
-1. The user's **yak-shears** project, the real migration test.
+1. A tiny standalone example in `examples/` (done: `examples/templates`, `examples/crossfile`, `examples/realworld`, `examples/runtime`).
+1. The user's **yak-shears** project, the real migration test (done: its templates carry `{#def #}` headers, and it consumes the package pending the PyPI publish).
 1. A demo Flask app as a later, optional showcase. Django only qualifies when it renders Jinja through `django-jinja`, because DTL is out of scope.
 
 ## Validation findings (spike, run against yak-shears)
@@ -215,7 +215,7 @@ Two concrete gaps this surfaced, now pulled into the v1 scope above:
 
 ## Open questions
 
-- Header ergonomics: does `{#def ... #}` feel right in real templates, or is a sidecar preferable? (Decide after using it on yak-shears.)
-- pyright dependency: acceptable to require it, or should mypy be a supported backend too? (pyright-only for the spike.)
-- Globals declaration shape: a `{#globals#}` header per template, or one project-level config file that names the Environment globals once? (Lean config file, because globals are environment-wide.)
-- How to handle `{% include %}` and macro imports without cross-template context flow: skip-and-warn for v1.
+- Wrapper codegen shape: yak-shears' hand-written `render_*` helpers return `starlette.responses.HTMLResponse` (one also sets an `HTTPStatus`) while `generate_wrapper` returns `Markup`, and some helpers do real work before rendering. Either the wrapper grows a caller-supplied "wrap the render" callable, or apps keep their helpers and generate only the inner typed render. Tracked in doing.txt.
+- Checker config: `_write_pyright_config` writes a fresh `pyrightconfig.json`, so the stub is checked under different settings than the project's own source (mypy pydantic plugin, custom stub paths). See BACKENDS.md.
+
+Resolved, recorded so they stay settled: the `{#def ... #}` header survived the yak-shears migration, so no sidecar for now (sidecar binding stays on the deferred list). Globals are declared once in `[tool.types_for_jinja]` in pyproject.toml, not per template. pyright stays the required backend for `check`, with `types-for-jinja generate` as the bring-your-own-checker path (measurements parked in BACKENDS.md). `{% import %}` macros resolve cross-file since v1.1, while `{% include %}` remains skip-and-warn on the deferred list.

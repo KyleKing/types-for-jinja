@@ -1,12 +1,17 @@
 # types-for-jinja
 
-Type-check your Jinja2 templates. It is mypy for the context you pass to a template.
+Type-check your Jinja2 templates. `types-for-jinja` is mypy for the context you pass to a template: declare the context once, in a comment, and pyright validates every variable and attribute the template touches. There is no new template language, Jinja renders unchanged, and there is no runtime cost by default.
 
-## The problem
+`types-for-jinja` is deliberately narrow (Jinja2 plus the dialects Jinja's own parser reads). If your needs differ, there are alternatives to consider:
 
-The variables you hand a Jinja template are untyped. Rename a model field, mistype an attribute, or forget to pass a variable, and nothing tells you until the template renders, often in production. types-for-jinja closes that gap without a new template language and without changing how Jinja renders. You declare the context once, in a comment, and a type checker validates every variable and attribute the template touches.
+- [TypeJinja](https://dl.acm.org/doi/10.1145/3786583.3786905) type-checks dbt's Jinja against dbt's own IR and ships with the dbt fusion engine, so use it for dbt projects
+- [templ](https://github.com/a-h/templ) (Go), [askama](https://github.com/askama-rs/askama) (Rust), and [Twirl](https://github.com/playframework/twirl) (Scala) compile templates into typed host-language functions, the ergonomic model this project borrows
+- [JinjaX](https://github.com/jpsca/jinjax) adds component syntax to Jinja (the `{#def #}` header comes from JinjaX) and composes with `types-for-jinja` rather than replacing it
+- [djlint](https://github.com/djlint/djLint) lints and formats template style rather than types, so it runs alongside rather than instead
 
 ## 30-second example
+
+Add a one-line header to a template naming its context:
 
 ```jinja
 {#def
@@ -19,13 +24,15 @@ user: User
 {% endfor %}
 ```
 
+Run the checker:
+
 ```console
 $ types-for-jinja check templates/
 templates/greeting.html:5:14 error: Cannot access attribute "naem" for class "User" (reportAttributeAccessIssue)
 templates/greeting.html:8:14 error: Cannot access attribute "titel" for class "Item" (reportAttributeAccessIssue)
 ```
 
-The `{#def #}` block is a plain Jinja comment, so the template renders exactly as before. The loop variable is narrowed to its element type, so `item.titel` is caught too.
+The `{#def #}` block is a plain Jinja comment, so the template renders exactly as before. The loop variable is narrowed to its element type, so `item.titel` is caught the same way `user.naem` is.
 
 ## Installation
 
@@ -33,25 +40,21 @@ The `{#def #}` block is a plain Jinja comment, so the template renders exactly a
 uv add types-for-jinja      # or: pip install types-for-jinja
 ```
 
-types-for-jinja calls [pyright](https://github.com/microsoft/pyright) for the type inference, so pyright needs to be on your PATH.
+`types-for-jinja` calls [pyright](https://github.com/microsoft/pyright) for the type inference, so pyright needs to be on your PATH.
 
 ## How it works
 
-types-for-jinja parses the template with Jinja's own parser, transpiles it into a small Python stub that exercises every expression, and runs pyright over that stub. Errors map back to the template's own line and column. The stub is thrown away and Jinja renders the real template unchanged, so there is no runtime cost and nothing to migrate beyond the one-line header. Declare Environment globals (such as `static_url`) once under `[tool.types_for_jinja]` in `pyproject.toml` so the checker treats them as defined.
+`types-for-jinja` parses the template with Jinja's own parser, transpiles it into a small Python stub that exercises every expression, and runs pyright over that stub. Errors map back to the template's own line and column. The stub is thrown away and Jinja renders the real template unchanged, so there is nothing to migrate beyond the one-line header. Declare Environment globals (such as `static_url`) once under `[tool.types_for_jinja]` in `pyproject.toml` so the checker treats them as defined.
+
+`types-for-jinja check --format json` and `--format sarif` emit machine-readable output for CI. The SARIF report plugs into GitHub code scanning and coding agents. A pre-commit hook and an LSP (with a Neovim integration in `editors/nvim`) deliver the same diagnostics to commits and editors.
 
 ## Runtime checking (optional)
 
-Static checking is the default and costs nothing at runtime. To also validate the context at render time, types-for-jinja can generate a typed wrapper and enforce the types with [beartype](https://github.com/beartype/beartype) (check) or [Pydantic](https://github.com/pydantic/pydantic) (parse and coerce). Both work whether your context types are dataclasses or Pydantic models. A runnable proof lives in `examples/runtime`.
-
-## CI and agents
-
-`types-for-jinja check --format json` and `--format sarif` emit machine-readable output. The SARIF report plugs into GitHub code scanning and coding agents.
+Static checking is the default and costs nothing at runtime. To also validate the context at render time, `types-for-jinja` can generate a typed wrapper and enforce the types with [beartype](https://github.com/beartype/beartype) (check) or [Pydantic](https://github.com/pydantic/pydantic) (parse and coerce). Both work whether your context types are dataclasses or Pydantic models. A runnable proof lives in `examples/runtime`.
 
 ## Scope
 
-types-for-jinja checks Jinja2, and Jinja supersets and dialects that Jinja's own parser reads: plain Jinja2, JinjaX, and the templates in Flask, Litestar, FastAPI, Copier, and Cookiecutter projects. Supersets work today as long as they keep Jinja's standard delimiters.
-
-Ansible, Salt, and dbt are out of scope, because their contexts are untyped runtime dicts and their custom filter libraries would all report as `Any` (dbt already has TypeJinja). So are engines not hosted in Python (Nunjucks, Twig, Liquid, Handlebars) and Python engines with different lookup semantics (Django's DTL, Mako, Chameleon). See [PLAN] for the reasoning.
+`types-for-jinja` checks anything Jinja's own parser reads: plain Jinja2, JinjaX, and the templates in Flask, Litestar, FastAPI, Copier, and Cookiecutter projects, as long as the standard delimiters are kept. Out of scope on purpose: Ansible, Salt, and dbt (untyped runtime contexts and large custom filter libraries, and dbt already has TypeJinja), engines not hosted in Python (Nunjucks, Twig, Liquid, Handlebars), and Python engines with different lookup semantics (Django's DTL, Mako, Chameleon). See [PLAN] for the reasoning.
 
 ## Project Status
 

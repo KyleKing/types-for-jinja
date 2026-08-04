@@ -1,35 +1,41 @@
 Open items, priority order.
 
-1. Publish a real version to PyPI. Version is pinned at 0.0.1 and the Publish
-   to PyPI workflow is green but tag-gated, so nothing has shipped. This is
-   what unblocks yak-shears, which had to drop its editable path source at
+1. Fix the pyright-backed tests, then make CI run them. Root cause found:
+   commit e7ae496 ("ci: run prek") let prettier reformat
+   examples/templates/*.html, which collapsed the multi-line {#def #} headers
+   onto one line. The parser then reads the whole header as a single import
+   ('from examples.models import User user: User'), so the stub is garbage and
+   7 tests in tests/test_checker.py and tests/test_lsp.py fail. The tests are
+   correct and the fixtures drifted. Fix: restore the multi-line headers and keep
+   prettier off them, either by excluding examples/templates from the prettier
+   hook or by renaming the fixtures to .jinja (prettier's types_or does not
+   match jinja, and another hook already excludes \.jinja$). Then install
+   pyright in the CI test job: the typecheck job runs pyright-action, but the
+   macOS/Windows test matrix never installs pyright, so every
+   skipif(shutil.which('pyright')) test silently skips. Do this before
+   publishing so the tag ships a verified build.
+
+2. Publish to PyPI by pushing a tag. The Publish to PyPI workflow is green and
+   tag-gated, and the version is pinned at 0.0.1. No name is reserved on PyPI
+   (types-for-jinja and typed-jinja both 404), so the first upload claims the
+   name, and pyproject's types_for_jinja normalizes to types-for-jinja.
+   Publishing unblocks yak-shears, which dropped its editable path source at
    ../../local-code/typed-jinja to build.
 
-2. Pyright-backed tests never run in CI. Seven tests in tests/test_checker.py
-   and tests/test_lsp.py are gated behind skipif(shutil.which('pyright') is
-   None), and the CI test job never installs pyright, so the whole
-   pyright-backed suite is silently skipped. Locally those 7 fail: drift
-   between examples/templates/greeting_bad.html and the assertions (expected 3
-   diagnostics, got 4; expected `def _render(user: User) -> None:`). Decide
-   whether to update the assertions or the fixtures, then install pyright in
-   the CI test job so the suite actually runs.
+3. Point .copier-answers.yml at gh:KyleKing/calcipy_template. _src_path is
+   still the local path /Users/kyleking/Developer/kyleking/calcipy_template,
+   which a Fleet run on another machine can't resolve. _commit is already
+   5.0.3, so this is a one-line change.
 
-3. Point .copier-answers.yml at the published template. _src_path is still
-   the local path /Users/kyleking/Developer/kyleking/calcipy_template, which a
-   Fleet run on another machine can't resolve. _commit is already 5.0.3, so
-   switching _src_path to gh:KyleKing/calcipy_template is unblocked.
+4. Open design question, after publish: yak-shears hand-writes 7 render_*
+   functions that restate the parameter list their template's {#def ... #}
+   header already declares, the same signature generate_wrapper would emit.
+   The blocker is that generate_wrapper returns Markup while yak-shears'
+   helpers return starlette.responses.HTMLResponse (and render_error also
+   sets an HTTPStatus), and some helpers do real work before rendering.
+   Decide whether types-for-jinja grows a "wrap the render in a
+   caller-supplied callable" option, or yak-shears keeps its helpers and only
+   generates the inner typed render.
 
-4. Open design question: yak-shears hand-writes 7 render_* functions that
-   restate the parameter list their template's {#def ... #} header already
-   declares, the same signature generate_wrapper would emit. The blocker is
-   that generate_wrapper returns Markup while yak-shears' helpers return
-   starlette.responses.HTMLResponse (and render_error also sets an
-   HTTPStatus), and some helpers do real work before rendering. Decide
-   whether types-for-jinja grows a "wrap the render in a caller-supplied
-   callable" option, or yak-shears keeps its helpers and only generates the
-   inner typed render.
-
-5. Rename follow-up: package, CLI, docs, and .copier-answers.yml now read
-   types-for-jinja / types_for_jinja. Still needs the git remote pointed at
-   the renamed GitHub repo and a check that the reserved PyPI name matches
-   pyproject.toml exactly before the item-1 publish.
+Done, for the record: the git remote points at the renamed repo
+(KyleKing/types-for-jinja).
