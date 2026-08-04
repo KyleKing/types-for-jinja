@@ -24,15 +24,29 @@ def _warn(message: str) -> None:
     print(f'types-for-jinja: {message}', file=sys.stderr)  # ruff:ignore[print]
 
 
-def _iter_templates(paths: list[Path]) -> list[Path]:
+def _iter_templates(paths: list[Path], config: Config) -> list[Path]:
+    """Expand directory arguments into template files, deduplicated and in a stable order.
+
+    A pattern may match a file another already matched (``page.html.jinja`` is both ``*.html``
+    and ``*.jinja``), so the same template must not be generated twice.
+    """
     found: list[Path] = []
     for path in paths:
-        if path.is_dir():
-            found.extend(sorted(path.rglob('*.html')))
-            found.extend(sorted(path.rglob('*.jinja')))
-        else:
+        if not path.is_dir():
             found.append(path)
-    return found
+            continue
+        found.extend(sorted({match for glob in config.template_globs for match in path.rglob(glob)}))
+    return list(dict.fromkeys(found))
+
+
+def _default_paths(config: Config) -> list[Path]:
+    """Where to look when the command was given no paths: the configured template directories.
+
+    A ``package:subdirectory`` entry contributes only its subdirectory, since that is the part
+    that exists as a path in the project being checked.
+    """
+    entries = (Path(entry.partition(':')[2] or entry) for entry in config.template_dirs)
+    return [path for path in entries if path.is_dir()]
 
 
 def _generate(templates: list[Path], out_dir: Path, *, check_only: bool) -> int:
@@ -115,14 +129,20 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _dispatch(argv: list[str] | None) -> int:
-    default_out_dir = Path(load_config(Path.cwd()).out_dir)
+    config = load_config(Path.cwd())
+    default_out_dir = Path(config.out_dir)
     parser = argparse.ArgumentParser(prog='types-for-jinja')
     subparsers = parser.add_subparsers(dest='command', required=True)
     generate_parser = subparsers.add_parser(
         'generate',
         help='write type-checking stubs for your own type checker to pick up',
     )
-    generate_parser.add_argument('paths', nargs='+', type=Path, help='template files or directories')
+    generate_parser.add_argument(
+        'paths',
+        nargs='*',
+        type=Path,
+        help='template files or directories; defaults to the configured template_dirs',
+    )
     generate_parser.add_argument(
         '-o',
         '--out-dir',
@@ -156,7 +176,12 @@ def _dispatch(argv: list[str] | None) -> int:
         'wrapper',
         help='write a typed render function per template, so the render call site is checked too',
     )
-    wrapper_parser.add_argument('paths', nargs='+', type=Path, help='template files or directories')
+    wrapper_parser.add_argument(
+        'paths',
+        nargs='*',
+        type=Path,
+        help='template files or directories; defaults to the configured template_dirs',
+    )
     wrapper_parser.add_argument('-o', '--out-dir', type=Path, default=None, help='output directory')
     wrapper_parser.add_argument(
         '--validator',
@@ -180,11 +205,16 @@ def _dispatch(argv: list[str] | None) -> int:
 
     if args.command == 'remap':
         return _remap(args)
-    templates = _iter_templates(args.paths)
+    paths = args.paths or _default_paths(config)
+    if not paths:
+        _warn('no paths given and no template_dirs configured')
+        return _EXIT_BAD_CONFIG
+    templates = _iter_templates(paths, config)
     if args.command == 'generate':
         return _generate(templates, args.out_dir, check_only=args.check)
-    config = _wrapper_config(args, load_config(Path.cwd()))
-    return _wrapper(templates, config, args.out_dir or Path(config.wrapper.out_dir), check_only=args.check)
+    wrapper_config = _wrapper_config(args, config)
+    out_dir = args.out_dir or Path(wrapper_config.wrapper.out_dir)
+    return _wrapper(templates, wrapper_config, out_dir, check_only=args.check)
 
 
 if __name__ == '__main__':

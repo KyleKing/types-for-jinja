@@ -73,10 +73,10 @@ uv publish
 |------------------------------------------------|-----------:|--------:|---------:|---------:|
 | `types_for_jinja/__init__.py`                  | 4          | 0       | 0        | 100.0%   |
 | `types_for_jinja/_runtime_type_check_setup.py` | 13         | 0       | 37       | 100.0%   |
-| `types_for_jinja/cli.py`                       | 96         | 11      | 0        | 86.1%    |
+| `types_for_jinja/cli.py`                       | 105        | 11      | 0        | 87.2%    |
 | `types_for_jinja/complete.py`                  | 194        | 14      | 0        | 89.8%    |
 | `types_for_jinja/components.py`                | 104        | 4       | 0        | 94.3%    |
-| `types_for_jinja/config.py`                    | 69         | 1       | 0        | 97.5%    |
+| `types_for_jinja/config.py`                    | 72         | 0       | 0        | 100.0%   |
 | `types_for_jinja/diagnostic.py`                | 11         | 0       | 0        | 100.0%   |
 | `types_for_jinja/emit.py`                      | 34         | 0       | 0        | 100.0%   |
 | `types_for_jinja/filters.py`                   | 19         | 0       | 0        | 100.0%   |
@@ -91,7 +91,7 @@ uv publish
 | `types_for_jinja/suppress.py`                  | 26         | 0       | 0        | 100.0%   |
 | `types_for_jinja/transpile.py`                 | 441        | 54      | 0        | 85.6%    |
 | `types_for_jinja/wrapper.py`                   | 92         | 2       | 0        | 96.6%    |
-| **Totals**                                     | 2176       | 162     | 39       | 89.9%    |
+| **Totals**                                     | 2188       | 161     | 39       | 90.0%    |
 
 Generated on: 2026-08-04
 <!-- {cte} -->

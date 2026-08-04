@@ -48,6 +48,9 @@ class Syntax:
 DEFAULT_OUT_DIR = '_jinja_stubs'
 """Where generated stubs go. Must not start with a dot, which pyright excludes by default."""
 
+DEFAULT_TEMPLATE_GLOBS = ('*.html', '*.jinja', '*.j2')
+"""Filename patterns a directory argument is searched for, recursively."""
+
 EXTENSIONS: dict[str, tuple[str, ...]] = {
     'debug': (),
     'do': (),
@@ -78,6 +81,7 @@ class Config:
     out_dir: str = DEFAULT_OUT_DIR
     suppression: str = 'portable'
     template_dirs: list[str] = field(default_factory=list)
+    template_globs: list[str] = field(default_factory=lambda: list(DEFAULT_TEMPLATE_GLOBS))
     wrapper: WrapperConfig = field(default_factory=WrapperConfig)
     syntax: Syntax = field(default_factory=Syntax)
 
@@ -99,6 +103,7 @@ def load_config(root: Path) -> Config:
         out_dir=_out_dir(table.get('out_dir', DEFAULT_OUT_DIR)),
         suppression=_suppression(table.get('suppression', 'portable')),
         template_dirs=list(table.get('template_dirs', [])),
+        template_globs=list(table.get('template_globs', DEFAULT_TEMPLATE_GLOBS)),
         wrapper=WrapperConfig(**_known(WrapperConfig, table.get('wrapper', {}))),
         syntax=Syntax(**_known(Syntax, table.get('syntax', {}))),
     )

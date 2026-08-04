@@ -29,7 +29,7 @@ user: User
 Generate the stubs, then run whichever checker the project already uses:
 
 ```console
-$ types-for-jinja generate templates/
+$ types-for-jinja generate templates/    # or just `generate`, with template_dirs set
 types-for-jinja: Wrote 5 file(s) for 1 template(s)
 $ ty check
 _jinja_stubs/templates/greeting_html.py:5:5: error[unresolved-attribute] Object of type `User` has no attribute `naem`
@@ -146,7 +146,8 @@ Everything lives under `[tool.types_for_jinja]` in `pyproject.toml`, and every s
 | `imports` | none | Import lines the generated stubs need to resolve the types named in `globals` |
 | `out_dir` | `_jinja_stubs` | Where stubs go. Rejected unless every path segment is an identifier, since the stubs import each other relatively |
 | `suppression` | `portable` | Which ignore comment `{# type: ignore #}` becomes: `portable`, `mypy`, `pyright`, or `ty` |
-| `template_dirs` | none | Where `{% extends %}`, `{% include %}`, and `{% import %}` are resolved from. Accepts `package:subdirectory` |
+| `template_dirs` | none | Where `{% extends %}`, `{% include %}`, and `{% import %}` are resolved from, and what `generate` searches when given no paths. Accepts `package:subdirectory` |
+| `template_globs` | `*.html`, `*.jinja`, `*.j2` | Patterns a directory argument is searched for |
 | `language_server` | first found | Pins the language server attribute completion asks, instead of taking the first on `PATH` |
 | `extensions` | none | jinja2 extensions to load so their tags parse: `debug`, `do`, `i18n`, `loopcontrols` |
 | `syntax` | Jinja's own | Delimiters, using `jinja2.Environment`'s own keyword names |
