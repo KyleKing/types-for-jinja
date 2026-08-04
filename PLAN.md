@@ -166,7 +166,8 @@ v1 is a checker that is quiet (globals), scriptable (JSON/SARIF), and drops into
 - Shipped (v1): the checker (undefined variables plus attribute and item access), the CLI with `--format text|json|sarif`, the Environment globals declaration, a pre-commit hook, and hardening (template-syntax and missing-pyright handling, broader Jinja coverage).
 - Shipped (v1.1): the LSP with Neovim integration, live unsaved-buffer checking (debounced so pyright does not queue behind keystrokes), and completion and hover for the typed context's own names, scoped per line and tolerant of the half-typed buffer that completion runs against; macro bodies, with a macro's own `{#def #}` block typing its parameters for its body and its callers across files; cross-file `{% extends %}` base-context and `{% import %}`/`{% from import %}` macro resolution; stable rule codes (`TJ###`) with inline `{# type: ignore #}` suppression.
 - Shipped (v1.1): `types-for-jinja wrapper`, which writes one typed render function per template with `--check` for CI, reads `[tool.types_for_jinja.wrapper]`, and takes a `--return-type` so a framework response class replaces `Markup`. Level-2 enforcement (`--validator beartype|pydantic`) rides on the same command; `examples/runtime` remains the runnable proof of both validators.
-- Deferred: `{% include %}` context flow, multi-level `extends`, and full filter type signatures (filter results are `Any`).
+- Shipped (v1.1): `{% include %}` context flow (the include is checked against the including template's context) and multi-level `{% extends %}` chains, both cycle-safe, with cross-file errors reported at the `{% include %}` or `{% extends %}` line of the file being checked rather than at a line number from another file.
+- Deferred: full filter and test type signatures (results are `Any`).
 
 ## Scope
 
@@ -185,7 +186,6 @@ v1 is a checker that is quiet (globals), scriptable (JSON/SARIF), and drops into
 
 - Attribute completion after a `.`, which needs the declared type resolved rather than just named. The context's own names now complete and hover (see Status); the base expression is already parsed out and handed to the completion handler, so what remains is asking a type checker what members that expression has.
 - General Jinja language features in the LSP: tag and filter completions, hover docs for built-ins. [typed-htmx](https://github.com/Desdaemon/typed-htmx) is the reference point, it types htmx attributes for JSX completions the same way.
-- `{% include %}` cross-template context, multi-level `{% extends %}` chains
 - Full filter and test type signatures (results are `Any` today)
 - Extension-tag declaration (rung 2)
 - Framework adapters (Flask, Django-Jinja2, FastAPI) that locate "this view renders this template with this context"
@@ -216,4 +216,4 @@ Two concrete gaps this surfaced, now pulled into the v1 scope above:
 
 - Checker config: `_write_pyright_config` writes a fresh `pyrightconfig.json`, so the stub is checked under different settings than the project's own source (mypy pydantic plugin, custom stub paths). See BACKENDS.md.
 
-Resolved, recorded so they stay settled: the wrapper's return type is configurable (`--return-type` / `return_type`), so an app returning `HTMLResponse` generates the whole function rather than only an inner render; a helper that also sets a status code or does work before rendering stays hand-written and calls the generated function. The `{#def ... #}` header survived the yak-shears migration, so no sidecar for now (sidecar binding stays on the deferred list). Globals are declared once in `[tool.types_for_jinja]` in pyproject.toml, not per template. pyright stays the required backend for `check`, with `types-for-jinja generate` as the bring-your-own-checker path (measurements parked in BACKENDS.md). `{% import %}` macros resolve cross-file since v1.1, while `{% include %}` remains skip-and-warn on the deferred list.
+Resolved, recorded so they stay settled: the wrapper's return type is configurable (`--return-type` / `return_type`), so an app returning `HTMLResponse` generates the whole function rather than only an inner render; a helper that also sets a status code or does work before rendering stays hand-written and calls the generated function. The `{#def ... #}` header survived the yak-shears migration, so no sidecar for now (sidecar binding stays on the deferred list). Globals are declared once in `[tool.types_for_jinja]` in pyproject.toml, not per template. pyright stays the required backend for `check`, with `types-for-jinja generate` as the bring-your-own-checker path (measurements parked in BACKENDS.md). `{% import %}` macros, `{% include %}` bodies, and whole `{% extends %}` chains all resolve cross-file since v1.1.

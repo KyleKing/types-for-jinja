@@ -34,6 +34,16 @@ MacroTypes = dict[int, dict[str, str]]
 """Declared parameter types for each ``{% macro %}``, keyed by the macro's line number."""
 
 
+@dataclass(frozen=True)
+class _Emit:
+    """What the emitters need beyond the node itself: declared types and how to reach other files."""
+
+    macro_types: MacroTypes
+    search_dirs: list[Path]
+    env: Environment
+    seen: frozenset[Path] = frozenset()
+
+
 def macro_defs(source: str, tree: nodes.Template) -> tuple[MacroTypes, list[str]]:
     """Bind each ``{#def #}`` block inside a macro body to that macro.
 
@@ -111,20 +121,26 @@ def transpile(
     env = Environment(autoescape=True)
     tree = env.parse(source)
     macro_types, macro_imports = macro_defs(source, tree)
-    split = _split_top_level(tree, _search_dirs(template_path, config), env, macro_types)
+    ctx = _Emit(
+        macro_types=macro_types,
+        search_dirs=_search_dirs(template_path, config),
+        env=env,
+        seen=frozenset({template_path.resolve()} if template_path is not None else ()),
+    )
+    split = _split_top_level(tree, ctx)
 
     lines = _preamble(header, config, [*macro_imports, *split.imports])
     preamble_len = len(lines)
-    lines.extend(_mark_foreign(split.foreign_defs))
+    lines.extend(split.foreign_defs)
     lines.extend(split.module_defs)
 
     signature = ', '.join(f'{name}: {type_str}' for name, type_str in header.params)
     lines.append(Line(0, f'def _render({signature}) -> None:', header.lineno))
     body: list[Line] = []
-    _emit_body(split.render_nodes, body, 1, macro_types)
+    _emit_body(split.render_nodes, body, 1, ctx)
     inherited: list[Line] = []
-    _emit_body(split.base_nodes, inherited, 1, macro_types)
-    body.extend(_mark_foreign(inherited))
+    _emit_body(split.base_nodes, inherited, 1, ctx)
+    body.extend(_mark_foreign(inherited, split.base_lineno))
     if not body:
         body.append(Line(1, 'pass', header.lineno))
     lines.extend(body)
@@ -146,25 +162,28 @@ class _TopLevel:
     base_nodes: list[nodes.Node] = field(default_factory=list)
     foreign_defs: list[Line] = field(default_factory=list)
     imports: list[str] = field(default_factory=list)
+    base_lineno: int = 1
 
 
-def _split_top_level(
-    tree: nodes.Template,
-    search_dirs: list[Path],
-    env: Environment,
-    macro_types: MacroTypes,
-) -> _TopLevel:
+def _split_top_level(tree: nodes.Template, ctx: _Emit) -> _TopLevel:
     split = _TopLevel()
     for node in tree.body:
         match node:
             case nodes.Macro():
-                _emit_macro(node, split.module_defs, macro_types)
+                _emit_macro(node, split.module_defs, ctx)
             case nodes.Extends():
-                split.base_nodes.extend(_load_base_nodes(node, search_dirs, split.foreign_defs, env, split.imports))
+                defs: list[Line] = []
+                split.base_nodes.extend(_load_base_nodes(node, ctx, defs, split.imports))
+                split.foreign_defs.extend(_mark_foreign(defs, node.lineno))
+                split.base_lineno = node.lineno
             case nodes.FromImport():
-                _emit_from_import(node, search_dirs, split.foreign_defs, env, split.imports)
+                defs = []
+                _emit_from_import(node, ctx, defs, split.imports)
+                split.foreign_defs.extend(_mark_foreign(defs, node.lineno))
             case nodes.Import():
-                _emit_import(node, search_dirs, split.foreign_defs, env, split.imports)
+                defs = []
+                _emit_import(node, ctx, defs, split.imports)
+                split.foreign_defs.extend(_mark_foreign(defs, node.lineno))
             case _:
                 split.render_nodes.append(node)
     return split
@@ -193,9 +212,14 @@ def _unique(items: list[str]) -> list[str]:
     return list(dict.fromkeys(items))
 
 
-def _mark_foreign(lines: list[Line]) -> list[Line]:
-    """Flag lines whose ``lineno`` belongs to another template, not the one being checked."""
-    return [replace(line, foreign=True) for line in lines]
+def _mark_foreign(lines: list[Line], lineno: int) -> list[Line]:
+    """Flag lines that came from another template and re-stamp them to the tag that pulled them in.
+
+    Their own line numbers belong to a file the reader is not looking at, so an error in a
+    base or included template is reported against the ``{% extends %}`` or ``{% include %}``
+    that brought it here.
+    """
+    return [replace(line, foreign=True, lineno=lineno) for line in lines]
 
 
 def _search_dirs(template_path: Path | None, config: Config) -> list[Path]:
@@ -210,66 +234,71 @@ def _render_line(line: Line) -> str:
     return f'{prefix}{line.text}{marker}'
 
 
-def _emit_body(body: list[nodes.Node], out: list[Line], indent: int, macro_types: MacroTypes) -> None:
+def _emit_body(body: list[nodes.Node], out: list[Line], indent: int, ctx: _Emit) -> None:
     for node in body:
-        _emit_node(node, out, indent, macro_types)
+        _emit_node(node, out, indent, ctx)
 
 
-def _emit_node(node: nodes.Node, out: list[Line], indent: int, macro_types: MacroTypes) -> None:  # ruff:ignore[complex-structure, too-many-branches]
+def _emit_node(node: nodes.Node, out: list[Line], indent: int, ctx: _Emit) -> None:  # ruff:ignore[complex-structure, too-many-branches]
     match node:
         case nodes.Output():
             for child in node.nodes:
                 if not isinstance(child, nodes.TemplateData):
                     _emit_expr_check(child, out, indent)
         case nodes.For():
-            _emit_for(node, out, indent, macro_types)
+            _emit_for(node, out, indent, ctx)
         case nodes.If():
-            _emit_if(node, out, indent, macro_types)
+            _emit_if(node, out, indent, ctx)
         case nodes.Assign():
             _emit_assign(node, out, indent)
         case nodes.AssignBlock():
-            _emit_body(node.body, out, indent, macro_types)
+            _emit_body(node.body, out, indent, ctx)
         case nodes.FilterBlock():
-            _emit_body(node.body, out, indent, macro_types)
+            _emit_body(node.body, out, indent, ctx)
         case nodes.Scope() | nodes.Block():
-            _emit_body(node.body, out, indent, macro_types)
+            _emit_body(node.body, out, indent, ctx)
         case nodes.With():
-            _emit_with(node, out, indent, macro_types)
+            _emit_with(node, out, indent, ctx)
         case nodes.CallBlock():
             _emit_expr_check(node.call, out, indent)
-            _emit_body(node.body, out, indent, macro_types)
+            _emit_body(node.body, out, indent, ctx)
+        case nodes.Include():
+            included, include_ctx = _load_include_nodes(node, ctx)
+            inner: list[Line] = []
+            _emit_body(included, inner, indent, include_ctx)
+            out.extend(_mark_foreign(inner, node.lineno))
         case nodes.Macro():
-            _emit_macro(node, out, macro_types, indent=indent)
+            _emit_macro(node, out, ctx, indent=indent)
         case _:
             _emit_fallback_names(node, out, indent)
 
 
-def _emit_for(node: nodes.For, out: list[Line], indent: int, macro_types: MacroTypes) -> None:
+def _emit_for(node: nodes.For, out: list[Line], indent: int, ctx: _Emit) -> None:
     target = _target(node.target)
     iterable = _iter_expr(node.iter, out, indent)
     out.append(Line(indent, f'for {target} in {iterable}:', node.lineno))
     inner: list[Line] = [Line(indent + 1, 'loop = _tj_loop', node.lineno)]
-    _emit_body(node.body, inner, indent + 1, macro_types)
+    _emit_body(node.body, inner, indent + 1, ctx)
     out.extend(inner)
     if node.else_:
         out.append(Line(indent, 'if True:', node.lineno))
-        _emit_body(node.else_, out, indent + 1, macro_types)
+        _emit_body(node.else_, out, indent + 1, ctx)
 
 
-def _emit_if(node: nodes.If, out: list[Line], indent: int, macro_types: MacroTypes) -> None:
+def _emit_if(node: nodes.If, out: list[Line], indent: int, ctx: _Emit) -> None:
     out.append(Line(indent, f'if {_cond(node.test, out, indent)}:', node.lineno))
-    _emit_block(node.body, out, indent, node.lineno, macro_types)
+    _emit_block(node.body, out, indent, node.lineno, ctx)
     for elif_node in node.elif_:
         out.append(Line(indent, f'elif {_cond(elif_node.test, out, indent)}:', elif_node.lineno))
-        _emit_block(elif_node.body, out, indent, elif_node.lineno, macro_types)
+        _emit_block(elif_node.body, out, indent, elif_node.lineno, ctx)
     if node.else_:
         out.append(Line(indent, 'else:', node.lineno))
-        _emit_block(node.else_, out, indent, node.lineno, macro_types)
+        _emit_block(node.else_, out, indent, node.lineno, ctx)
 
 
-def _emit_block(body: list[nodes.Node], out: list[Line], indent: int, lineno: int, macro_types: MacroTypes) -> None:
+def _emit_block(body: list[nodes.Node], out: list[Line], indent: int, lineno: int, ctx: _Emit) -> None:
     inner: list[Line] = []
-    _emit_body(body, inner, indent + 1, macro_types)
+    _emit_body(body, inner, indent + 1, ctx)
     if not inner:
         inner.append(Line(indent + 1, 'pass', lineno))
     out.extend(inner)
@@ -285,7 +314,7 @@ def _emit_assign(node: nodes.Assign, out: list[Line], indent: int) -> None:
     out.append(Line(indent, f'{target} = {value}', node.lineno))
 
 
-def _emit_with(node: nodes.With, out: list[Line], indent: int, macro_types: MacroTypes) -> None:
+def _emit_with(node: nodes.With, out: list[Line], indent: int, ctx: _Emit) -> None:
     for target, value in zip(node.targets, node.values, strict=False):
         name = _target(target)
         try:
@@ -294,7 +323,7 @@ def _emit_with(node: nodes.With, out: list[Line], indent: int, macro_types: Macr
             _emit_fallback_names(value, out, indent)
             rendered = 'None'
         out.append(Line(indent, f'{name} = {rendered}', node.lineno))
-    _emit_body(node.body, out, indent, macro_types)
+    _emit_body(node.body, out, indent, ctx)
 
 
 def _macro_params(node: nodes.Macro, macro_types: MacroTypes) -> str:
@@ -320,16 +349,16 @@ def _macro_param(name: str, type_str: str | None, *, defaulted: bool) -> str:
 def _emit_macro(
     node: nodes.Macro,
     out: list[Line],
-    macro_types: MacroTypes,
+    ctx: _Emit,
     *,
     indent: int = 0,
     alias: str | None = None,
 ) -> None:
     name = alias or node.name
-    signature = _macro_params(node, macro_types)
+    signature = _macro_params(node, ctx.macro_types)
     out.append(Line(indent, f'def {name}({signature}) -> _TJAny:', node.lineno))
     inner: list[Line] = []
-    _emit_body(node.body, inner, indent + 1, macro_types)
+    _emit_body(node.body, inner, indent + 1, ctx)
     if not inner:
         inner.append(Line(indent + 1, 'pass', node.lineno))
     out.extend(inner)
@@ -339,12 +368,12 @@ def _emit_macro_stub(
     node: nodes.Macro,
     out: list[Line],
     indent: int,
-    macro_types: MacroTypes,
+    ctx: _Emit,
     *,
     alias: str | None = None,
 ) -> None:
     name = alias or node.name
-    out.append(Line(indent, f'def {name}({_macro_params(node, macro_types)}) -> _TJAny: ...', node.lineno))
+    out.append(Line(indent, f'def {name}({_macro_params(node, ctx.macro_types)}) -> _TJAny: ...', node.lineno))
 
 
 def _const_str(node: nodes.Node) -> str | None:
@@ -360,20 +389,13 @@ class _ForeignMacros:
     imports: list[str]
 
 
-def _load_macros(template: nodes.Node, search_dirs: list[Path], env: Environment) -> _ForeignMacros | None:
-    ref = _const_str(template)
-    if ref is None:
+def _load_macros(template: nodes.Node, ctx: _Emit) -> _ForeignMacros | None:
+    loaded = _load_template(template, ctx)
+    if loaded is None:
         return None
-    resolved = resolve_template(ref, search_dirs)
-    if resolved is None:
-        return None
-    try:
-        tree = env.parse(resolved[1])
-    except TemplateSyntaxError:
-        return None
-    types, imports = macro_defs(resolved[1], tree)
+    types, imports = macro_defs(loaded.source, loaded.tree)
     return _ForeignMacros(
-        macros={child.name: child for child in tree.body if isinstance(child, nodes.Macro)},
+        macros={child.name: child for child in loaded.tree.body if isinstance(child, nodes.Macro)},
         types=types,
         imports=imports,
     )
@@ -381,40 +403,80 @@ def _load_macros(template: nodes.Node, search_dirs: list[Path], env: Environment
 
 def _load_base_nodes(
     node: nodes.Extends,
-    search_dirs: list[Path],
+    ctx: _Emit,
     module_defs: list[Line],
-    env: Environment,
     imports: list[str],
 ) -> list[nodes.Node]:
-    ref = _const_str(node.template)
-    if ref is None:
+    """Collect the nodes a base template contributes, walking the whole ``extends`` chain.
+
+    ``seen`` breaks a cycle, so a template that (directly or not) extends itself stops
+    instead of recursing forever.
+    """
+    loaded = _load_template(node.template, ctx)
+    if loaded is None:
         return []
-    resolved = resolve_template(ref, search_dirs)
-    if resolved is None:
-        return []
-    try:
-        tree = env.parse(resolved[1])
-    except TemplateSyntaxError:
-        return []
-    base_types, base_imports = macro_defs(resolved[1], tree)
+    base_types, base_imports = macro_defs(loaded.source, loaded.tree)
     imports.extend(base_imports)
+    base_ctx = replace(ctx, macro_types=base_types, seen=loaded.seen)
     top_level: list[nodes.Node] = []
-    for child in tree.body:
+    for child in loaded.tree.body:
         if isinstance(child, nodes.Macro):
-            _emit_macro(child, module_defs, base_types)
-        elif not isinstance(child, nodes.Block | nodes.Extends):
+            _emit_macro(child, module_defs, base_ctx)
+        elif isinstance(child, nodes.Extends):
+            top_level.extend(_load_base_nodes(child, base_ctx, module_defs, imports))
+        elif not isinstance(child, nodes.Block):
             top_level.append(child)
     return top_level
 
 
+def _load_include_nodes(node: nodes.Include, ctx: _Emit) -> tuple[list[nodes.Node], _Emit]:
+    """Collect the nodes an included template contributes.
+
+    ``{% include %}`` renders with the including template's context, so its expressions
+    are checked against that context: a name the include needs and the includer never
+    declared is an undefined variable, which is the whole point of checking it here.
+    """
+    loaded = _load_template(node.template, ctx)
+    if loaded is None:
+        return [], ctx
+    types, _ = macro_defs(loaded.source, loaded.tree)
+    body = [child for child in loaded.tree.body if not isinstance(child, nodes.Extends)]
+    return body, replace(ctx, macro_types=types, seen=loaded.seen)
+
+
+@dataclass(frozen=True)
+class _LoadedTemplate:
+    """Another template's parsed body, and the chain that reached it."""
+
+    source: str
+    tree: nodes.Template
+    seen: frozenset[Path]
+
+
+def _load_template(reference: nodes.Node, ctx: _Emit) -> _LoadedTemplate | None:
+    ref = _const_str(reference)
+    if ref is None:
+        return None
+    resolved = resolve_template(ref, ctx.search_dirs)
+    if resolved is None:
+        return None
+    path, source = resolved
+    if path.resolve() in ctx.seen:
+        return None
+    try:
+        tree = ctx.env.parse(source)
+    except TemplateSyntaxError:
+        return None
+    return _LoadedTemplate(source=source, tree=tree, seen=ctx.seen | {path.resolve()})
+
+
 def _emit_from_import(
     node: nodes.FromImport,
-    search_dirs: list[Path],
+    ctx: _Emit,
     module_defs: list[Line],
-    env: Environment,
     imports: list[str],
 ) -> None:
-    loaded = _load_macros(node.template, search_dirs, env)
+    loaded = _load_macros(node.template, ctx)
     if loaded is None or not loaded.macros:
         return
     imports.extend(loaded.imports)
@@ -422,17 +484,16 @@ def _emit_from_import(
         name, alias = entry if isinstance(entry, tuple) else (entry, entry)
         macro = loaded.macros.get(name)
         if macro is not None:
-            _emit_macro_stub(macro, module_defs, 0, loaded.types, alias=alias)
+            _emit_macro_stub(macro, module_defs, 0, replace(ctx, macro_types=loaded.types), alias=alias)
 
 
 def _emit_import(
     node: nodes.Import,
-    search_dirs: list[Path],
+    ctx: _Emit,
     module_defs: list[Line],
-    env: Environment,
     imports: list[str],
 ) -> None:
-    loaded = _load_macros(node.template, search_dirs, env)
+    loaded = _load_macros(node.template, ctx)
     if loaded is None:
         return
     imports.extend(loaded.imports)
@@ -442,7 +503,7 @@ def _emit_import(
         module_defs.append(Line(1, 'pass', node.lineno))
     for macro in loaded.macros.values():
         module_defs.append(Line(1, '@staticmethod', macro.lineno))
-        _emit_macro_stub(macro, module_defs, 1, loaded.types)
+        _emit_macro_stub(macro, module_defs, 1, replace(ctx, macro_types=loaded.types))
     module_defs.append(Line(0, f'{node.target} = {cls}', node.lineno))
 
 
