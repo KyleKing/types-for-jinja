@@ -152,7 +152,7 @@ def _name_items(source: str, line: int) -> list[t.CompletionItem]:
 
 
 def _member_items(source: str, line: int, expression: str) -> list[t.CompletionItem]:
-    """Ask pyright what ``expression`` offers, inside the scopes the template puts it in."""
+    """Ask a language server what ``expression`` offers, inside the scopes the template puts it in."""
     config = load_config(Path.cwd())
     header = parse_header(source, config.syntax)
     if header is None or not expression:

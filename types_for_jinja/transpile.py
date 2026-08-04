@@ -1,7 +1,7 @@
 """Transpile a Jinja2 template into a Python type-checking stub.
 
 The stub is never executed. It exercises every expression the template uses so a
-type checker (pyright) can validate variable, attribute, and item access against the
+type checker can validate variable, attribute, and item access against the
 declared context. Jinja still renders the template at runtime, unchanged. Each emitted
 line carries a ``# L<n>`` marker back to its source line in the template.
 """
@@ -431,7 +431,7 @@ def _emit_with(node: nodes.With, out: list[Line], indent: int, ctx: _Emit) -> No
 def _macro_params(node: nodes.Macro, macro_types: MacroTypes) -> str:
     """Render the macro's parameter list, annotated from its own ``{#def #}`` block.
 
-    An undeclared parameter stays unannotated so pyright infers it rather than
+    An undeclared parameter stays unannotated so the checker infers it rather than
     reporting every use of it.
     """
     declared = macro_types.get(node.lineno, {})

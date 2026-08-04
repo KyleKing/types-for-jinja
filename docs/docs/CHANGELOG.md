@@ -2,6 +2,7 @@
 
 ### Feat
 
+- **emit**: mangle templated directory names so Copier and Cookiecutter check
 - **cli**: broaden template discovery and default to template_dirs
 - **transpile**: check templates that use namespace() and Jinja's globals
 - **config**: declare jinja2 extensions so their tags parse

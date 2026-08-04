@@ -1,7 +1,7 @@
 """Generate a typed Python wrapper that delegates rendering to Jinja.
 
 The wrapper is the Level-1 codegen from the plan: a typed function whose call site
-pyright checks, whose body calls ``_env.get_template(name).render(...)`` unchanged.
+the project's checker checks, whose body calls ``_env.get_template(name).render(...)`` unchanged.
 Jinja still renders. An optional ``validator`` adds Level-2 runtime enforcement,
 either a ``@beartype`` guard (check, non-transforming) or a Pydantic ``TypeAdapter``
 (parse and transform) applied to each parameter before the render call.

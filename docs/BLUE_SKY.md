@@ -1,6 +1,6 @@
 # Blue sky
 
-Unscheduled work, kept out of PLAN.md so the plan stays a list of things that will happen. Everything here is gated on someone upstream, missing a technical pathway, or waiting for a user to ask. An item graduates into PLAN.md when its gate lifts, with the reasoning recorded here so it does not have to be rebuilt.
+Unscheduled work. Everything here is gated on someone upstream, missing a technical pathway, or waiting for a user to ask. An item leaves this file when its gate lifts, with the reasoning recorded here so it does not have to be rebuilt.
 
 Settled decisions and the measurements behind them are in [DESIGN.md](./DESIGN.md).
 
