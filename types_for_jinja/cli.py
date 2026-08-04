@@ -44,7 +44,7 @@ def _generate(templates: list[Path], out_dir: Path, *, check_only: bool) -> int:
             _warn(f'out of date: {path}')
         return 1 if outdated else 0
     changed = write(generated)
-    _warn(f'Wrote {len(changed)} of {len(generated.files)} stub(s) for {len(generated.stubs)} template(s)')
+    _warn(f'Wrote {len(changed)} file(s) for {len(generated.stubs)} template(s)')
     return 0
 
 
