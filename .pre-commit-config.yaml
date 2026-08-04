@@ -104,12 +104,13 @@ repos:
         pass_filenames: false
         require_serial: true
         stages: ["pre-push"]
-      - id: types-for-jinja
-        description: "Type-check this repo's example Jinja templates against their declared context"
-        entry: uv run types-for-jinja check
-        language: system
-        name: types-for-jinja (dogfood)
-        files: ^examples/.*\.(html|jinja)$
-        exclude: greeting_bad\.html\.jinja$
-        require_serial: true
-        stages: ["pre-commit"]
+      # PLANNED: Not actually useful yet
+      # - id: types-for-jinja
+      #   description: "Type-check this repo's example Jinja templates against their declared context"
+      #   entry: uv run types-for-jinja generate
+      #   language: system
+      #   name: types-for-jinja (dogfood)
+      #   files: ^examples/.*\.(html|jinja)$
+      #   exclude: greeting_bad\.html\.jinja$
+      #   require_serial: true
+      #   stages: ["pre-commit"]
