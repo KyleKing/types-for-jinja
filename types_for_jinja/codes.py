@@ -13,6 +13,7 @@ Code catalog:
 - ``TJ005`` argument of the wrong type
 - ``TJ006`` general type error
 - ``TJ010`` template syntax error
+- ``TJ011`` malformed ``{#def ... #}`` header
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from dataclasses import replace
 from types_for_jinja.diagnostic import Diagnostic
 
 RULE_CODES: dict[str, str] = {
+    'bad-header': 'TJ011',
     'no-header': 'TJ000',
     'reportArgumentType': 'TJ005',
     'reportAttributeAccessIssue': 'TJ002',

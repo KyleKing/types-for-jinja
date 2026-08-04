@@ -33,7 +33,7 @@ local function open(path)
 end
 
 -- Phase 1: bad template on disk.
-local bad = open(root .. '/examples/templates/greeting_bad.html')
+local bad = open(root .. '/examples/templates/greeting_bad.html.jinja')
 vim.wait(20000, function() return #vim.diagnostic.get(bad) > 0 end, 200)
 local disk_diags = vim.diagnostic.get(bad)
 io.write(string.format('phase1 (disk) diagnostics=%d\n', #disk_diags))
@@ -42,7 +42,7 @@ for _, d in ipairs(disk_diags) do
 end
 
 -- Phase 2: clean template, unsaved edit introduces a typo.
-local ok = open(root .. '/examples/templates/greeting_ok.html')
+local ok = open(root .. '/examples/templates/greeting_ok.html.jinja')
 vim.wait(3000, function() return false end, 200)
 local before = vim.diagnostic.get(ok)
 for i, line in ipairs(vim.api.nvim_buf_get_lines(ok, 0, -1, false)) do

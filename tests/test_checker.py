@@ -1,19 +1,18 @@
 """Tests for the header parser, transpiler, and pyright-backed checker."""
 
-import shutil
 from pathlib import Path
-
-import pytest
 
 from types_for_jinja.check import check_file
 from types_for_jinja.header import parse_header
 from types_for_jinja.transpile import transpile
 
-_TEMPLATES = Path('examples/templates')
-_BAD = _TEMPLATES / 'greeting_bad.html'
-_OK = _TEMPLATES / 'greeting_ok.html'
+from .configuration import requires_pyright
 
-pytestmark = pytest.mark.skipif(shutil.which('pyright') is None, reason='pyright is required')
+_TEMPLATES = Path('examples/templates')
+_BAD = _TEMPLATES / 'greeting_bad.html.jinja'
+_OK = _TEMPLATES / 'greeting_ok.html.jinja'
+
+pytestmark = requires_pyright
 
 
 def test_parse_header_reads_imports_and_params():

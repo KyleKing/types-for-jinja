@@ -34,15 +34,17 @@ The shipped config runs `types-for-jinja-lsp` from `PATH`, which works when the 
 
 ## What it checks
 
-The server checks the file on disk on open and on save (not unsaved buffer edits, for now). It runs the same checker as the CLI, so diagnostics match `types-for-jinja check`.
+The server checks the live buffer on open, on every change, and on save, so unsaved edits are reflected. It falls back to the file on disk when no buffer is tracked. It runs the same checker as the CLI, so diagnostics match `types-for-jinja check`.
 
 ## Verify
 
-`scripts/verify_lsp.sh` runs a headless Neovim, opens a template with known errors, and confirms the server attaches and publishes diagnostics. Expected output:
+`scripts/verify_lsp.sh` runs a headless Neovim over two phases: a bad template on disk, then an unsaved edit to a clean template. It exits non-zero unless both produce the expected diagnostics. Expected output:
 
 ```
-attached=true ready=true diagnostics=3
+phase1 (disk) diagnostics=3
   L5 C14 [types-for-jinja] Cannot access attribute "naem" for class "User" ...
   L11 C18 [types-for-jinja] Cannot access attribute "titel" for class "Item" ...
   L11 C13 [types-for-jinja] "author" is not defined
+phase2 (live buffer) clean_before=0 after_edit=1
+  L5 C14 [types-for-jinja] Cannot access attribute "nmae" for class "User" ...
 ```

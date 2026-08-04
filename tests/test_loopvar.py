@@ -1,13 +1,12 @@
 """The Jinja ``loop`` variable is defined inside a ``{% for %}`` body."""
 
-import shutil
 from pathlib import Path
-
-import pytest
 
 from types_for_jinja.check import check_source
 
-pytestmark = pytest.mark.skipif(shutil.which('pyright') is None, reason='pyright is required')
+from .configuration import requires_pyright
+
+pytestmark = requires_pyright
 
 _TEMPLATE = """{#def
 items: list[str]

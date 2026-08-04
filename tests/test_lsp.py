@@ -1,19 +1,19 @@
 """Tests for the types-for-jinja language server (in-process, no subprocess)."""
 
-import shutil
 from pathlib import Path
 
-import pytest
 from lsprotocol import types as t
 from pygls.lsp.server import LanguageServer
 
 from types_for_jinja.lsp import _publish, compute_diagnostics, compute_diagnostics_source
 
-_BAD = Path('examples/templates/greeting_bad.html')
-_OK = Path('examples/templates/greeting_ok.html')
+from .configuration import requires_pyright
+
+_BAD = Path('examples/templates/greeting_bad.html.jinja')
+_OK = Path('examples/templates/greeting_ok.html.jinja')
 _ERRORS_IN_BAD = 3
 
-pytestmark = pytest.mark.skipif(shutil.which('pyright') is None, reason='pyright is required')
+pytestmark = requires_pyright
 
 
 def test_compute_diagnostics_maps_positions_and_severity():

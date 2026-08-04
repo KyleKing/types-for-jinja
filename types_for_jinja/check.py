@@ -14,7 +14,7 @@ from jinja2 import TemplateSyntaxError
 from types_for_jinja.codes import apply_codes
 from types_for_jinja.config import Config, load_config
 from types_for_jinja.diagnostic import Diagnostic
-from types_for_jinja.header import parse_header
+from types_for_jinja.header import header_errors, parse_header
 from types_for_jinja.suppress import apply_suppressions
 from types_for_jinja.transpile import transpile
 
@@ -49,6 +49,9 @@ def _raw_diagnostics(source: str, path: Path, cache_dir: Path, config: Config | 
     header = parse_header(source)
     if header is None:
         return [Diagnostic(path, 1, 1, 'warning', 'no {#def ... #} type header; skipped', 'no-header')]
+    malformed = header_errors(header)
+    if malformed:
+        return [Diagnostic(path, header.lineno, 1, 'error', message, 'bad-header') for message in malformed]
     try:
         module = transpile(source, header, config or load_config(Path.cwd()), template_path=path)
     except TemplateSyntaxError as err:

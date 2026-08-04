@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import re
 from dataclasses import dataclass
 
@@ -35,3 +36,35 @@ def parse_header(source: str) -> TemplateHeader | None:
             name, type_str = line.split(':', 1)
             params.append((name.strip(), type_str.strip()))
     return TemplateHeader(imports=imports, params=params, lineno=lineno)
+
+
+def header_errors(header: TemplateHeader) -> list[str]:
+    """Return messages for header entries that are not valid Python, empty when the header is sound.
+
+    Each declaration occupies its own line. A formatter that joins them produces text that
+    still matches the header pattern but no longer parses, which this catches.
+    """
+    messages = [
+        f'malformed import in {{#def #}} header: {statement!r} (one declaration per line)'
+        for statement in header.imports
+        if not _parses(statement)
+    ]
+    messages.extend(
+        f'malformed parameter in {{#def #}} header: {name!r} is not an identifier (one declaration per line)'
+        for name, _ in header.params
+        if not name.isidentifier()
+    )
+    messages.extend(
+        f'malformed annotation in {{#def #}} header for {name!r}: {annotation!r}'
+        for name, annotation in header.params
+        if name.isidentifier() and not _parses(annotation, mode='eval')
+    )
+    return messages
+
+
+def _parses(source: str, mode: str = 'exec') -> bool:
+    try:
+        ast.parse(source, mode=mode)
+    except SyntaxError:
+        return False
+    return True

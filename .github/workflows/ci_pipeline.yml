@@ -38,9 +38,14 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           python-version: ${{ matrix.python-version }}
+          python-tools: pyright
 
+      # The checker shells out to pyright, and its tests skip without it. TYPES_FOR_JINJA_REQUIRE_PYRIGHT
+      # turns that skip into a failure so CI cannot go green on a suite that never ran.
       - name: Run test
         run: uv run calcipy-test test.pytest
+        env:
+          TYPES_FOR_JINJA_REQUIRE_PYRIGHT: "1"
 
   typecheck:
     runs-on: ubuntu-latest

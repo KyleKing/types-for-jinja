@@ -1,16 +1,15 @@
 """Tests for Environment-globals configuration."""
 
-import shutil
 from pathlib import Path
-
-import pytest
 
 from types_for_jinja.check import check_file
 from types_for_jinja.config import Config, load_config
 from types_for_jinja.header import parse_header
 from types_for_jinja.transpile import transpile
 
-_USES_GLOBALS = Path('examples/templates/uses_globals.html')
+from .configuration import requires_pyright
+
+_USES_GLOBALS = Path('examples/templates/uses_globals.html.jinja')
 
 
 def test_load_config_reads_project_globals():
@@ -41,6 +40,6 @@ def test_transpile_with_config_declares_globals():
     assert 'static_url: Callable[[str], str]' in code
 
 
-@pytest.mark.skipif(shutil.which('pyright') is None, reason='pyright is required')
+@requires_pyright
 def test_check_globals_template_is_clean(tmp_path):
     assert check_file(_USES_GLOBALS, cache_dir=tmp_path) == []

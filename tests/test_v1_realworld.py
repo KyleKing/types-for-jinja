@@ -1,13 +1,14 @@
 """Pyright-backed checks of the real yak-shears templates and filter handling."""
 
-import shutil
 from pathlib import Path
 
 import pytest
 
 from types_for_jinja.check import check_file
 
-pytestmark = pytest.mark.skipif(shutil.which('pyright') is None, reason='pyright is required')
+from .configuration import requires_pyright
+
+pytestmark = requires_pyright
 
 _RW = Path('examples/realworld')
 

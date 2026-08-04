@@ -1,10 +1,13 @@
-{#def from examples.models import User user: User #}
+{#def
+from examples.models import User
+user: User
+#}
 <h1>Hello {{ user.naem }}</h1>
 {% if user.is_admin %}
-<p>Admin access</p>
+  <p>Admin access</p>
 {% endif %}
 <ul>
-  {% for item in user.items %}
+{% for item in user.items %}
   <li>{{ item.titel }} by {{ author }}</li>
-  {% endfor %}
+{% endfor %}
 </ul>

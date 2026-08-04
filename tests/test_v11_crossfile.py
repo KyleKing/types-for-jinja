@@ -1,14 +1,13 @@
 """Cross-file checking: extends context flow and imported macros."""
 
-import shutil
 from pathlib import Path
-
-import pytest
 
 from types_for_jinja.check import check_file, check_source
 from types_for_jinja.config import Config
 
-pytestmark = pytest.mark.skipif(shutil.which('pyright') is None, reason='pyright is required')
+from .configuration import requires_pyright
+
+pytestmark = requires_pyright
 
 _CROSSFILE = Path('examples/crossfile')
 _CONFIG = Config(

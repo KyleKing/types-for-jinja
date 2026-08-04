@@ -110,6 +110,6 @@ repos:
         language: system
         name: types-for-jinja (dogfood)
         files: ^examples/.*\.(html|jinja)$
-        exclude: greeting_bad\.html$
+        exclude: greeting_bad\.html\.jinja$
         require_serial: true
         stages: ["pre-commit"]
