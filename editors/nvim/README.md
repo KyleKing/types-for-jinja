@@ -53,6 +53,13 @@ user           Field     user: User (parameter)
 
 Loop and macro variables appear only inside the body that binds them, and a `{% set %}` name only after the line that sets it. `K` (`vim.lsp.buf.hover`) reports the same description for the name under the cursor.
 
+What gets offered follows the cursor: built-in filters after a `|` (with their return type), built-in tests after `is`, and Jinja tags right after `{%`.
+
+```
+length  Function  length -> int (built-in filter)
+sort    Function  sort -> list[item] (built-in filter)
+```
+
 Attribute completion after a `.` is not offered yet; the checker still reports a bad attribute as a diagnostic.
 
 ## The command path

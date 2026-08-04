@@ -135,10 +135,10 @@ def test_half_typed_expression_still_completes():
 
 
 def test_half_typed_tag_falls_back_to_the_header():
-    """`{% fo` closes to an unknown tag, so only header and globals survive."""
-    typed = _SOURCE + '{% fo\n'
+    """`{% if us` has no closing tag, so the template never parses; the header still does."""
+    typed = _SOURCE + '{% if us\n'
 
-    labels = {item.label for item in complete(typed, 9, 5)}
+    labels = {item.label for item in complete(typed, 9, 8)}
 
     assert 'user' in labels
 
@@ -147,3 +147,45 @@ def test_unparsable_template_still_offers_header_names():
     broken = '{#def\nuser: str\n#}\n{% for %}\n{{ us\n'
 
     assert 'user' in {item.label for item in complete(broken, 4, 5)}
+
+
+def test_cursor_after_a_pipe_completes_filters():
+    assert cursor_context('{{ user | up', 12).kind == 'filter'
+
+
+def test_cursor_after_is_completes_tests():
+    assert cursor_context('{% if user is de', 16).kind == 'test'
+
+
+def test_cursor_right_after_a_block_opener_completes_tags():
+    assert cursor_context('{% fo', 5).kind == 'tag'
+    assert cursor_context('{% for item in it', 17).kind == 'name'
+
+
+def test_filter_completions_carry_the_return_type():
+    items = {item.label: item.detail for item in complete('{#def\nx: str\n#}\n{{ x | ', 3, 8)}
+
+    assert items['length'] == 'length -> int (built-in filter)'
+    assert items['sort'] == 'sort -> list[item] (built-in filter)'
+
+
+def test_test_completions_are_offered_after_is():
+    labels = {item.label for item in complete('{#def\nx: str\n#}\n{% if x is ', 3, 11)}
+
+    assert {'defined', 'divisibleby', 'iterable'} <= labels
+
+
+def test_tag_completions_are_offered_after_the_block_opener():
+    labels = {item.label for item in complete('{#def\nx: str\n#}\n{% ', 3, 3)}
+
+    assert {'for', 'if', 'macro', 'include'} <= labels
+
+
+def test_hover_describes_a_built_in_filter():
+    assert hover_text('{#def\nx: str\n#}\n{{ x | length }}\n', 3, 8) == 'length -> int (built-in filter)'
+
+
+def test_context_name_wins_over_a_built_in_of_the_same_name():
+    source = '{#def\nlength: int\n#}\n{{ length }}\n'
+
+    assert hover_text(source, 3, 4) == 'length: int (parameter)'

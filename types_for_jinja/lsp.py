@@ -12,12 +12,14 @@ cursor, which is what the ``{#def ... #}`` header is for.
 from __future__ import annotations
 
 import threading
+from collections.abc import Callable
 from pathlib import Path
 
 from lsprotocol import types as t
 from pygls.lsp.server import LanguageServer
 from pygls.uris import to_fs_path
 
+from types_for_jinja import filters
 from types_for_jinja.check import Diagnostic, PyrightNotFoundError, check_file, check_source
 from types_for_jinja.complete import ContextName, context_names, cursor_context, describe, word_at
 from types_for_jinja.config import load_config
@@ -81,24 +83,37 @@ _ORIGIN_KINDS = {
 
 def visible_names(source: str, line: int) -> list[ContextName]:
     """Return the context names visible on one-based ``line`` of ``source``."""
-    header = parse_header(source)
+    config = load_config(Path.cwd())
+    header = parse_header(source, config.syntax)
     if header is None:
         return []
-    return context_names(source, header, load_config(Path.cwd()), line=line)
+    return context_names(source, header, config, line=line)
 
 
 def complete(source: str, line: int, column: int) -> list[t.CompletionItem]:
-    """Complete context names at zero-based ``line`` and ``column``.
+    """Complete whatever the cursor is positioned on at zero-based ``line`` and ``column``.
 
-    Attribute access (anything after a ``.``) is left to the checker for now, so an
-    empty list there means "no suggestion", not "no such attribute".
+    Attribute access (anything after a ``.``) is left to the checker for now, so an empty
+    list there means "no suggestion", not "no such attribute".
     """
     lines = source.splitlines()
     if line >= len(lines):
         return []
-    context = cursor_context(lines[line], column)
-    if not context.in_expression or context.attribute_of:
-        return []
+    context = cursor_context(lines[line], column, load_config(Path.cwd()).syntax)
+    match context.kind:
+        case 'name':
+            return _name_items(source, line)
+        case 'filter':
+            return _catalog_items(filters.RETURNS, t.CompletionItemKind.Function, _filter_detail)
+        case 'test':
+            return _catalog_items(dict.fromkeys(filters.TESTS, 'bool'), t.CompletionItemKind.Function, _test_detail)
+        case 'tag':
+            return _catalog_items(dict.fromkeys(filters.TAGS, ''), t.CompletionItemKind.Keyword, _tag_detail)
+        case _:
+            return []
+
+
+def _name_items(source: str, line: int) -> list[t.CompletionItem]:
     return [
         t.CompletionItem(
             label=entry.name,
@@ -109,6 +124,40 @@ def complete(source: str, line: int, column: int) -> list[t.CompletionItem]:
     ]
 
 
+def _catalog_items(
+    catalog: dict[str, str],
+    kind: t.CompletionItemKind,
+    detail: Callable[[str, str], str],
+) -> list[t.CompletionItem]:
+    return [t.CompletionItem(label=name, kind=kind, detail=detail(name, value)) for name, value in catalog.items()]
+
+
+def _filter_detail(name: str, returns: str) -> str:
+    return f'{name} -> {_readable(returns)} (built-in filter)'
+
+
+def _test_detail(name: str, _returns: str) -> str:
+    return f'{name} -> bool (built-in test)'
+
+
+def _tag_detail(name: str, _value: str) -> str:
+    return f'{{% {name} %}} (Jinja tag)'
+
+
+def _readable(returns: str) -> str:
+    """Render an internal signature type the way a template author would read it."""
+    return returns.replace('_TJAny', 'Any').replace('_T', 'item')
+
+
+def builtin_hover(word: str) -> str | None:
+    """Describe a built-in filter, test, or tag, or ``None`` when ``word`` is none of them."""
+    if word in filters.RETURNS:
+        return _filter_detail(word, filters.RETURNS[word])
+    if word in filters.TESTS:
+        return _test_detail(word, 'bool')
+    return _tag_detail(word, '') if word in filters.TAGS else None
+
+
 def hover_text(source: str, line: int, column: int) -> str | None:
     """Describe the context name under zero-based ``line`` and ``column``, if there is one."""
     lines = source.splitlines()
@@ -117,7 +166,8 @@ def hover_text(source: str, line: int, column: int) -> str | None:
     word = word_at(lines[line], column)
     if not word:
         return None
-    return next((describe(entry) for entry in visible_names(source, line + 1) if entry.name == word), None)
+    described = next((describe(entry) for entry in visible_names(source, line + 1) if entry.name == word), None)
+    return described if described is not None else builtin_hover(word)
 
 
 def _live_source(server: LanguageServer, uri: str) -> str | None:
@@ -179,7 +229,7 @@ def _document_source(server: LanguageServer, uri: str) -> str | None:
     return Path(fs_path).read_text(encoding='utf-8') if fs_path else None
 
 
-@SERVER.feature(t.TEXT_DOCUMENT_COMPLETION, t.CompletionOptions(trigger_characters=[' ', '.']))
+@SERVER.feature(t.TEXT_DOCUMENT_COMPLETION, t.CompletionOptions(trigger_characters=[' ', '.', '|', '%']))
 def completion(server: LanguageServer, params: t.CompletionParams) -> t.CompletionList:
     """Offer the context names visible at the cursor."""
     source = _document_source(server, params.text_document.uri)

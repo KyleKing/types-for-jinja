@@ -12,6 +12,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Literal
 
 from jinja2 import TemplateSyntaxError, nodes
 
@@ -42,31 +43,55 @@ class ContextName:
     origin: str
 
 
+Kind = Literal['none', 'name', 'attribute', 'filter', 'test', 'tag']
+
+
 @dataclass(frozen=True)
 class CursorContext:
     """What the cursor is positioned to complete inside a template."""
 
-    in_expression: bool
+    kind: Kind
     attribute_of: str
     prefix: str
+
+    @property
+    def in_expression(self) -> bool:
+        """Whether the cursor sits inside ``{{ }}`` or ``{% %}`` rather than in markup."""
+        return self.kind != 'none'
 
 
 def cursor_context(line_text: str, column: int, syntax: Syntax | None = None) -> CursorContext:
     """Classify the cursor at zero-based ``column`` of ``line_text``.
 
-    ``attribute_of`` is the dotted expression left of a trailing ``.`` (empty when the
-    cursor is completing a bare name). Only ``{{ }}`` and ``{% %}`` count as expressions;
-    a ``{# #}`` comment does not.
+    ``attribute_of`` is the dotted expression left of a trailing ``.``, set only when
+    ``kind`` is ``attribute``. Only ``{{ }}`` and ``{% %}`` count as expressions; a
+    ``{# #}`` comment does not.
     """
-    openers, closers, _, comment = _delimiters(syntax or Syntax())
+    resolved = syntax or Syntax()
+    openers, closers, _, comment = _delimiters(resolved)
     head = line_text[:column]
     opener, closer = _last_index(head, openers), _last_index(head, closers)
     if opener is None or (closer is not None and closer > opener) or head.startswith(comment, opener):
-        return CursorContext(in_expression=False, attribute_of='', prefix='')
+        return CursorContext(kind='none', attribute_of='', prefix='')
     match = _IDENT_RUN.search(head)
     prefix = match.group(0) if match else ''
     before = head[: len(head) - len(prefix)]
-    return CursorContext(in_expression=True, attribute_of=_dotted_base(before), prefix=prefix)
+    return CursorContext(kind=_kind(before, opener, resolved), attribute_of=_dotted_base(before), prefix=prefix)
+
+
+def _kind(before: str, opener: int, syntax: Syntax) -> Kind:
+    """What the text left of the cursor's word says is being completed."""
+    if _dotted_base(before):
+        return 'attribute'
+    inside_block = before.startswith(syntax.block_start_string, opener)
+    if inside_block and not before[opener + len(syntax.block_start_string) :].strip():
+        return 'tag'
+    stripped = before.rstrip()
+    if stripped.endswith('|'):
+        return 'filter'
+    if stripped.endswith((' is', ' is not')):
+        return 'test'
+    return 'name'
 
 
 def context_names(

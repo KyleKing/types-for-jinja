@@ -17,6 +17,60 @@ from __future__ import annotations
 MODULE_NAME = '_tj_filters'
 TEST_STUB = '_tj_test'
 
+TAGS: tuple[str, ...] = (
+    'block',
+    'call',
+    'do',
+    'elif',
+    'else',
+    'extends',
+    'filter',
+    'for',
+    'from',
+    'if',
+    'import',
+    'include',
+    'macro',
+    'raw',
+    'set',
+    'with',
+)
+"""Jinja statement tags worth completing after ``{%``. Closing tags follow from these."""
+
+TESTS: tuple[str, ...] = (
+    'boolean',
+    'callable',
+    'defined',
+    'divisibleby',
+    'eq',
+    'escaped',
+    'even',
+    'false',
+    'filter',
+    'float',
+    'ge',
+    'gt',
+    'in',
+    'integer',
+    'iterable',
+    'le',
+    'lower',
+    'lt',
+    'mapping',
+    'ne',
+    'none',
+    'number',
+    'odd',
+    'sameas',
+    'sequence',
+    'string',
+    'test',
+    'true',
+    'undefined',
+    'upper',
+)
+"""Jinja's built-in tests, all of which evaluate to ``bool``."""
+
 RETURNS: dict[str, str] = {
     'abs': '_TJAny',
     'attr': '_TJAny',
