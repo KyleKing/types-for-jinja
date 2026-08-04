@@ -4,6 +4,8 @@ Design notes from 2026-07-29, revised 2026-08-04 once `generate` was made to che
 
 Measured with pyright 1.1.411 (mise pipx), ty 0.0.61, and mypy 2.3.0 on macOS.
 
+Superseded in part on 2026-08-04: PLAN.md's "Direction (2026-08)" removes `check` entirely, so everything below about `check` owning a subprocess describes the system being retired. The measurements, the backend table, and the suppression findings still hold and are what the pivot rests on.
+
 ## Decision: `generate` is the portable path, `check` stays on pyright
 
 `types-for-jinja generate` writes stubs that pyright, ty, and mypy all read the same way, verified by `tests/test_backends.py` on every run where the backend is installed. `check` keeps its own pyright subprocess and its `TJ###` codes, because it owns the diagnostics it prints.

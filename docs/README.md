@@ -1,6 +1,8 @@
 # types-for-jinja
 
-Type-check your Jinja2 templates. `types-for-jinja` is mypy for the context you pass to a template: declare the context once, in a comment, and pyright validates every variable and attribute the template touches. There is no new template language, Jinja renders unchanged, and there is no runtime cost by default.
+Type-check your Jinja2 templates with the type checker you already run. Declare a template's context once, in a comment, and `types-for-jinja generate` writes a line-aligned Python stub for it. pyright, ty, or mypy then reports every bad variable and attribute the template touches, at the template's own line, in the same run that checks the rest of your code. There is no new template language, Jinja renders unchanged, and there is no runtime cost by default.
+
+The only dependency is jinja2. types-for-jinja never invokes a type checker itself, so template checks run under your checker, your version, and your configuration, including checker plugins such as the mypy pydantic plugin.
 
 `types-for-jinja` is deliberately narrow (Jinja2 plus the dialects Jinja's own parser reads). If your needs differ, there are alternatives to consider:
 
@@ -11,7 +13,7 @@ Type-check your Jinja2 templates. `types-for-jinja` is mypy for the context you 
 
 ## 30-second example
 
-Add a one-line header to a template naming its context:
+Add a header to a template naming its context:
 
 ```jinja
 {#def
@@ -24,12 +26,21 @@ user: User
 {% endfor %}
 ```
 
-Run the checker:
+Generate the stubs, then run whichever checker the project already uses:
 
 ```console
-$ types-for-jinja check templates/
-templates/greeting.html:5:14 error: Cannot access attribute "naem" for class "User" (reportAttributeAccessIssue)
-templates/greeting.html:8:14 error: Cannot access attribute "titel" for class "Item" (reportAttributeAccessIssue)
+$ types-for-jinja generate templates/
+$ ty check
+_jinja_stubs/templates/greeting_html.py:5:5: error[unresolved-attribute] Object of type `User` has no attribute `naem`
+_jinja_stubs/templates/greeting_html.py:7:5: error[unresolved-attribute] Object of type `Item` has no attribute `titel`
+```
+
+Generated line N is template line N, so the line numbers are the template's own. Pipe through `remap` when you want the template's path and column too:
+
+```console
+$ ty check | types-for-jinja remap
+templates/greeting.html:5:16: error[unresolved-attribute] Object of type `User` has no attribute `naem`
+templates/greeting.html:7:11: error[unresolved-attribute] Object of type `Item` has no attribute `titel`
 ```
 
 The `{#def #}` block is a plain Jinja comment, so the template renders exactly as before. The loop variable is narrowed to its element type, so `item.titel` is caught the same way `user.naem` is.
@@ -48,7 +59,7 @@ A macro takes its own `{#def #}` block, which types its parameters for both its 
 
 Without that block the parameters stay untyped and only arity is checked.
 
-Jinja's built-in filters carry their return type, so a filtered expression is still checked: `{{ items | length }}` is an `int`, and `{% for x in items | sort %}` still knows what `x` is. Only the return type is pinned, because a filter catalog that guesses at argument types reports errors on correct templates. A filter the catalog does not know (yours, or one from an extension) falls back to `Any`, exactly as before.
+Jinja's built-in filters carry their return type, so a filtered expression is still checked: `{{ items | length }}` is an `int`, and `{% for x in items | sort %}` still knows what `x` is. Only the return type is pinned, because a filter catalog that guesses at argument types reports errors on correct templates. A filter the catalog does not know (yours, or one from an extension) falls back to `Any`.
 
 ## Installation
 
@@ -56,39 +67,39 @@ Jinja's built-in filters carry their return type, so a filtered expression is st
 uv add types-for-jinja      # or: pip install types-for-jinja
 ```
 
-`types-for-jinja check` calls [pyright](https://github.com/microsoft/pyright) for the type inference, so pyright needs to be on your PATH. `types-for-jinja generate` needs no checker of its own and works with pyright, ty, or mypy; see "Use your own type checker" below.
+That installs jinja2 and nothing else. Bring your own checker: pyright, ty, and mypy are each verified against the generated stubs on every CI run, and anything that reads standard Python annotations should work the same way.
 
 ## How it works
 
-`types-for-jinja` parses the template with Jinja's own parser, transpiles it into a small Python stub that exercises every expression, and runs pyright over that stub. Errors map back to the template's own line and column. The stub is thrown away and Jinja renders the real template unchanged, so there is nothing to migrate beyond the one-line header. Declare Environment globals (such as `static_url`) once under `[tool.types_for_jinja]` in `pyproject.toml` so the checker treats them as defined.
+`types-for-jinja generate` parses each template with Jinja's own parser and writes a small Python module that exercises every expression the template uses, preserving nesting so your checker's scoping and narrowing mirror Jinja's. `{% for item in items %}` becomes a real `for` loop, so the checker infers the element type. The stub tree mirrors the template tree under `_jinja_stubs/` (only the filename is mangled, because a module name cannot carry a template extension), and a manifest maps each stub back to its template. Environment globals such as `static_url` are declared once under `[tool.types_for_jinja]` in `pyproject.toml` so they never show up as undefined.
 
-`types-for-jinja check --format json` and `--format sarif` emit machine-readable output for CI. The SARIF report plugs into GitHub code scanning and coding agents. A pre-commit hook and an LSP (with a Neovim integration in `editors/nvim`) deliver the same diagnostics to commits and editors. The LSP also completes and describes the typed context: its names, the members of their types, Jinja's built-in filters and tests, and its tags.
+Commit the stubs and a fresh clone type-checks its templates with no types-for-jinja run at all. Add `types-for-jinja generate --check` to pre-commit or CI to fail when a stub is missing or out of date; the shipped pre-commit hook does exactly that.
 
-## Use your own type checker
+Cross-file constructs resolve at generation time: a child checks against its whole `{% extends %}` chain, an `{% include %}` body checks against the including template's context, and `{% import %}`-ed macros carry their own `{#def #}` types to their callers.
 
-`types-for-jinja generate` writes the stubs to disk instead of checking them, so your existing pyright, ty, or mypy run covers your templates and nothing shells out to a second checker:
+## In your editor
 
-```console
-types-for-jinja generate templates/ -o _jinja_stubs
-ty check          # or: mypy .  /  pyright
-```
+The stubs are ordinary workspace Python, so the Python language server you already run flags them with no setup: open the stub and the error is on the same line number as the template. Two layers make that invisible:
 
-Generated line N is template line N, so every checker reports the right line. All three are verified against each other on every CI run. Commit the stubs and a fresh clone type-checks correctly without types-for-jinja installed at all. Run `types-for-jinja generate --check` in a pre-commit hook to fail when one is out of date.
+- The `types-for-jinja-lsp` server (the `lsp` extra) attaches to template buffers and regenerates the stub as you type, debounced, so your Python checker re-checks it live before you save. It also completes and describes the typed context in the template itself: the names visible at the cursor, the members of their types after a `.`, built-in filters after `|` (with return types), tests after `is`, and tags after `{%`, plus hover for all of them.
+- A thin mirror republishes the stub's diagnostics onto the template buffer, line for line, so errors appear inline in the template with your checker's own codes. `editors/nvim` ships the autocmd for Neovim; a VS Code extension covers the same for VS Code.
 
-The one thing a stub cannot carry is the template's own path and column. Your checker names `_jinja_stubs/templates/profile_html.py:5`, where the template has `templates/profile.jinja:5:18`. The line is right and the stub tree mirrors the template tree. For template-native positions with columns, use the LSP in your editor or `types-for-jinja check` in CI.
+Attribute completion asks a Python language server (`pyright-langserver` today) what the expression's type offers; when none is installed, member completion is simply absent and everything else still works.
 
-An inline `{# type: ignore #}` becomes a blanket ignore comment on the generated line. Checkers spell that differently, so name yours if you run only one:
+## Suppressing a diagnostic
+
+An inline `{# type: ignore #}` in the template becomes a blanket ignore comment on the generated line. Checkers spell that differently, so name yours if you run only one:
 
 ```toml
 [tool.types_for_jinja]
 suppression = "ty" # portable (default), mypy, pyright, or ty
 ```
 
-The default emits `# type: ignore`, which all three honour. Naming a checker emits only what that checker reads, so `pyright` writes `# pyright: ignore` and mypy will not honour it.
+The default emits `# type: ignore`, which pyright, ty, and mypy all honour. Naming a checker emits only what that checker reads, so `pyright` writes `# pyright: ignore` and mypy will not honour it. Suppression is blanket per line rather than per code, because rule codes differ between checkers and a wrong one fails to suppress.
 
 ## Typed render calls (optional)
 
-`check` types the inside of a template. `types-for-jinja wrapper` types the call site, so `render_profile(porfile=...)` fails pyright the same way a typo in the template body does:
+`generate` types the inside of a template. `types-for-jinja wrapper` types the call site, so `render_profile(porfile=...)` fails your checker the same way a typo in the template body does:
 
 ```console
 $ types-for-jinja wrapper templates/ -o myapp/_render \
@@ -152,6 +163,16 @@ template_dirs = ["myapp:templates", "local/templates"]
 
 Out of scope on purpose: Ansible, Salt, and dbt (untyped runtime contexts and large custom filter libraries, and dbt already has TypeJinja), engines not hosted in Python (Nunjucks, Twig, Liquid, Handlebars), and Python engines with different lookup semantics (Django's DTL, Mako, Chameleon). See [PLAN] for the reasoning.
 
+## Limitations
+
+- Raw checker output names the stub, not the template. The line number is the template's own, and the stub tree mirrors the template tree, so the mapping reads at a glance; `remap` recovers the path and column for CI logs, and the editor mirror recovers them inline. Python has no equivalent of Go's `//line` directive, which is why the path cannot be fixed at the source.
+- Stubs must be regenerated when templates change. `generate --check` in pre-commit or CI catches a stale one; the LSP regenerates on edit.
+- A template with no line-aligned form (rare; measured under 3% on real template sets) falls back to `# L<n>` markers, which `remap` and the mirror still read, and raw checker output does not.
+- Filter and test argument types are unchecked; only built-in return types are pinned, and unknown filters widen to `Any`.
+- JinjaX component tags (`<Card title={{ x }} />`) have the embedded expressions checked, and the component boundary (attribute names against the component's own `{#def #}`) not yet.
+- Tags from Jinja extensions (`{% trans %}`, `{% do %}`, `{% break %}`) need the extension declared under `[tool.types_for_jinja] extensions` so the parser accepts them; without it the template is skipped with a warning.
+- Templates that exist only behind a `DictLoader` or a database still need a copy on disk to be checked.
+
 ## Project Status
 
 Early and moving. See [PLAN] for the architecture, roadmap, and design decisions, plus the `Open Issues` and the [CODE_TAG_SUMMARY]. For release history, see the [CHANGELOG].
@@ -178,9 +199,6 @@ If you have any security issue to report, please contact the project maintainers
 ## License
 
 [LICENSE]
-
-```
-```
 
 [changelog]: https://types-for-jinja.kyleking.me/docs/CHANGELOG
 [code_tag_summary]: https://types-for-jinja.kyleking.me/docs/CODE_TAG_SUMMARY
