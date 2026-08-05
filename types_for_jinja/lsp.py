@@ -379,7 +379,7 @@ def remap_positions(_server: LanguageServer, params: object) -> dict[str, object
     if resolved is None:
         return {'template': None, 'positions': []}
     return {
-        'template': str(resolved.path),
+        'template': resolved.path.as_posix(),
         'positions': [
             None if entry is None else {'line': entry.line - 1, 'character': entry.column - 1} for entry in located
         ],

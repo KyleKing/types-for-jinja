@@ -85,7 +85,7 @@ def relative(path: Path, base: Path) -> PurePosixPath:
     """Express ``path`` under ``base`` as a portable relative path."""
     resolved = path.resolve()
     root = base.resolve()
-    return PurePosixPath(resolved.relative_to(root) if resolved.is_relative_to(root) else path)
+    return PurePosixPath((resolved.relative_to(root) if resolved.is_relative_to(root) else path).as_posix())
 
 
 def load(out_dir: Path) -> Manifest:
