@@ -17,6 +17,7 @@ from types_for_jinja.config import Config, load_config
 from types_for_jinja.generate import generate, stale, write
 from types_for_jinja.remap import FORMATS, Remapper, remap
 from types_for_jinja.wrapper import VALIDATORS, build_wrappers
+from types_for_jinja.wrapper import plan as wrapper_plan
 from types_for_jinja.wrapper import stale as wrapper_stale
 from types_for_jinja.wrapper import write as wrapper_write
 
@@ -75,8 +76,9 @@ def _wrapper(templates: list[Path], config: Config, out_dir: Path, *, check_only
         for path in outdated:
             _warn(f'out of date: {path}')
         return 1 if outdated else 0
+    planned, _ = wrapper_plan(wrappers)
     changed = wrapper_write(wrappers)
-    _warn(f'Wrote {len(changed)} of {len(wrappers.files)} wrapper file(s)')
+    _warn(f'Wrote {len(changed)} of {len(planned)} wrapper file(s)')
     return 0
 
 
