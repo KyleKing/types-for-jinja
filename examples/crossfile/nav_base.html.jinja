@@ -1,0 +1,8 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    {% if current_route == 'a' %}<span class="active"></span>{% endif %}
+    {% if current_route == 'b' %}<span class="active"></span>{% endif %}
+    {% block content %}{% endblock %}
+  </body>
+</html>

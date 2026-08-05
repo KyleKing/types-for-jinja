@@ -75,6 +75,35 @@ def test_a_namespace_assignment_has_an_aligned_form(tmp_path):
     assert 'ns.n = 1' in generated.stubs[0].files[generated.stubs[0].path]
 
 
+def test_marker_mode_if_branch_keeps_its_own_body(tmp_path):
+    """``else`` sharing the ``if``'s own line used to strand the if-branch's later-lined body.
+
+    Not under ``examples/``: this template can have no aligned form (a multi-statement
+    for-loop branch), and ``test_aligned_stub_keeps_template_line_numbers`` requires every
+    shipped example to align.
+    """
+    source = (
+        '{#def\nitems: list[str]\n#}\n'
+        '{% if items %}\n'
+        '  {% for item in items %}\n'
+        '    {{ item.upper() }}{{ item.lower() }}\n'
+        '  {% endfor %}\n'
+        '{% else %}\n'
+        '  none\n'
+        '{% endif %}\n'
+    )
+    template = tmp_path / 'list_page.html.jinja'
+    template.write_text(source, encoding='utf-8')
+
+    generated = generate([template], tmp_path / 'out')
+
+    assert generated.unaligned == [template]
+    code = generated.stubs[0].files[generated.stubs[0].path]
+    tree = ast.parse(code)
+    if_node = next(node for node in ast.walk(tree) if isinstance(node, ast.If))
+    assert any(isinstance(stmt, ast.For) for stmt in if_node.body)
+
+
 def test_an_unsupported_construct_skips_one_template_not_the_run(tmp_path, monkeypatch):
     """One template the transpiler cannot model must not stop the others being generated."""
     real = transpile

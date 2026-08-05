@@ -23,6 +23,11 @@ _SCAFFOLD = (
     'from typing import Any as _TJAny, cast as _tj_cast',
     '_tj_any = _tj_cast(_TJAny, 0)',
     'loop = _tj_any',
+    # `_drop_loop_bindings` only strips `loop = _tj_loop` from local content, hoisting the
+    # binding to `loop = _tj_any` above; foreign content (from `{% extends %}` or a typed
+    # `{% include %}`) keeps its own `loop = _tj_loop` lines, so `_tj_loop` still needs a
+    # binding here for those to resolve.
+    '_tj_loop = _tj_any',
     '_tj_default = _tj_any',
 )
 _SCAFFOLD_PREFIXES = ('def _tj_any', '_tj_loop', '_tj_default')
@@ -94,7 +99,7 @@ def _sidecar(preamble: list[Line], foreign: list[Line], header: TemplateHeader) 
         return ''
     body = [
         *(replace(line, text=_at_root(line.text)) for line in _flatten_preamble(preamble, header)),
-        *(replace(line, indent=max(line.indent - 1, 0)) for line in foreign),
+        *foreign,
     ]
     return '\n'.join('    ' * line.indent + line.text for line in body) + '\n'
 

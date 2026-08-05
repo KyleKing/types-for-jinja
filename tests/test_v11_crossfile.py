@@ -83,6 +83,28 @@ def test_cross_file_error_points_at_the_local_tag(examples_project):
     assert [entry.line for entry in found] == [5]
 
 
+def test_extended_nav_with_empty_branches_is_clean(examples_project):
+    """A same-lined ``if`` in an extended base used to collapse onto its own ``pass``."""
+    assert reported(_CROSSFILE / 'nav_child.html.jinja', _CONFIG) == []
+
+
+def test_typed_include_clean(examples_project):
+    """A typed include checks as a call, with the includer's own for-loop variable as the arg."""
+    assert reported(_CROSSFILE / 'uses_typed_include.html.jinja', _CONFIG) == []
+
+
+def test_typed_include_missing_context_errors(examples_project):
+    """A typed include's own header names what it needs; an includer that never binds it errors."""
+    template = write_template(
+        'examples/crossfile/bad_typed_include.html.jinja',
+        '{#def\nother: str\n#}\n<main>{% include "_typed_card.html.jinja" %}</main>\n',
+    )
+
+    found = reported(template, _CONFIG)
+
+    assert any(entry.mentions('xs') for entry in found)
+
+
 def test_include_cycle_terminates(project):
     template = write_template(
         'templates/loop.html.jinja',

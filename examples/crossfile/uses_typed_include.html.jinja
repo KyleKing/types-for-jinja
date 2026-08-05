@@ -1,0 +1,6 @@
+{#def
+groups: list[list[str]]
+#}
+{% for xs in groups %}
+  {% include "_typed_card.html.jinja" %}
+{% endfor %}

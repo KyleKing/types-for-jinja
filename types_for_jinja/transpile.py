@@ -16,8 +16,8 @@ from jinja2 import Environment, TemplateSyntaxError, nodes
 
 from types_for_jinja import components, filters
 from types_for_jinja.config import EXTENSIONS, Config, Syntax
-from types_for_jinja.emit import relative_module
-from types_for_jinja.header import TemplateHeader, parse_defs
+from types_for_jinja.emit import flat_name, relative_module
+from types_for_jinja.header import TemplateHeader, header_errors, parse_defs, parse_header
 from types_for_jinja.resolve import resolve_template, search_paths
 
 _CMP_OPS = {
@@ -174,7 +174,7 @@ def transpile(
     lines = _preamble(
         header,
         config,
-        [*macro_imports, *split.imports, *filter_imports(tree, depth)],
+        [*macro_imports, *split.imports, *filter_imports(tree, *split.base_nodes, depth=depth)],
         _jinja_globals(tree, config),
     )
     preamble_len = len(lines)
@@ -365,10 +365,7 @@ def _emit_node(node: nodes.Node, out: list[Line], indent: int, ctx: _Emit) -> No
             _emit_expr_check(node.call, out, indent)
             _emit_body(node.body, out, indent, ctx)
         case nodes.Include():
-            included, include_ctx = _load_include_nodes(node, ctx)
-            inner: list[Line] = []
-            _emit_body(included, inner, indent, include_ctx)
-            out.extend(_mark_foreign(inner, node.lineno))
+            _emit_include(node, out, indent, ctx)
         case nodes.Macro():
             _emit_macro(node, out, ctx, indent=indent)
         case _:
@@ -394,8 +391,14 @@ def _emit_if(node: nodes.If, out: list[Line], indent: int, ctx: _Emit) -> None:
         out.append(Line(indent, f'elif {_cond(elif_node.test, out, indent)}:', elif_node.lineno))
         _emit_block(elif_node.body, out, indent, elif_node.lineno, ctx)
     if node.else_:
-        out.append(Line(indent, 'else:', node.lineno))
-        _emit_block(node.else_, out, indent, node.lineno, ctx)
+        # Jinja tracks no line for `{% else %}` itself, and stamping it with the `if`'s own
+        # line would tie it for that line's position in the later global line-number sort,
+        # stranding the if-branch's own (later-lined) body after it. Anything already
+        # emitted here is provably earlier in template order, so its highest line number is
+        # always a safe lower bound.
+        else_lineno = max((line.lineno for line in out), default=node.lineno)
+        out.append(Line(indent, 'else:', else_lineno))
+        _emit_block(node.else_, out, indent, else_lineno, ctx)
 
 
 def _emit_block(body: list[nodes.Node], out: list[Line], indent: int, lineno: int, ctx: _Emit) -> None:
@@ -531,19 +534,61 @@ def _load_base_nodes(
     return top_level
 
 
-def _load_include_nodes(node: nodes.Include, ctx: _Emit) -> tuple[list[nodes.Node], _Emit]:
-    """Collect the nodes an included template contributes.
+def _emit_include(node: nodes.Include, out: list[Line], indent: int, ctx: _Emit) -> None:
+    """Check an ``{% include %}`` as a call, since Jinja shares the includer's scope with it.
 
-    ``{% include %}`` renders with the including template's context, so its expressions
-    are checked against that context: a name the include needs and the includer never
-    declared is an undefined variable, which is the whole point of checking it here.
+    A typed include already names exactly what it needs from that scope, in its own
+    ``{#def #}`` header: that header becomes a checked function's signature, and the call
+    site (emitted locally, at the include's own position) passes the includer's own names
+    for each declared parameter. A name the include needs and the includer never bound is
+    now a real error at the include tag, not a silent pass through a sidecar no local name
+    reaches. An untyped include (no header) falls back to sharing raw, unchecked context,
+    since there is nothing to build a signature from.
     """
     loaded = _load_template(node.template, ctx)
     if loaded is None:
-        return [], ctx
+        return
+    header = parse_header(loaded.source, ctx.syntax)
+    if header is None or header_errors(header):
+        _emit_untyped_include(node, loaded, out, indent, ctx)
+        return
+    # No leading underscore: the sidecar reaches the aligned stub through `import *`, which
+    # skips underscore-prefixed names, so a `_tj_`-style name here would never be visible
+    # at the call site below.
+    name = f'tj_include_{flat_name(Path(_const_str(node.template) or "include"))}'
+    include_ctx = replace(ctx, seen=loaded.seen)
+    # +1 on every indent here: this content still has to pass through the same "inside
+    # def _render(...):" unwrap every other emitted line does before it reaches the sidecar
+    # (see _unwrap_render), so it has to start one level deep like everything else, not at
+    # the module level it will actually land at.
+    body: list[Line] = [Line(1, imp, node.lineno) for imp in header.imports]
+    body.append(Line(1, f'def {name}({_signature(header)}) -> None:', node.lineno))
+    # depth=0: the sidecar this lands in always sits at the output root (see _sidecar).
+    inner: list[Line] = [Line(2, imp, node.lineno) for imp in filter_imports(loaded.tree, depth=0)]
+    top_level = [child for child in loaded.tree.body if not isinstance(child, nodes.Extends)]
+    _emit_body(top_level, inner, 2, include_ctx)
+    if not inner:
+        inner.append(Line(2, 'pass', node.lineno))
+    body.extend(inner)
+    out.extend(_mark_foreign(body, node.lineno))
+    # A bare call, not `_ = ...`: the function is declared `-> None`, and mypy's
+    # func-returns-value flags assigning a None-returning call's result even to `_`.
+    call_args = ', '.join(f'{param.name}={param.name}' for param in header.params)
+    out.append(Line(indent, f'{name}({call_args})', node.lineno))
+
+
+def _emit_untyped_include(
+    node: nodes.Include,
+    loaded: _LoadedTemplate,
+    out: list[Line],
+    indent: int,
+    ctx: _Emit,
+) -> None:
     types, _ = macro_defs(loaded.source, loaded.tree, ctx.syntax)
     body = [child for child in loaded.tree.body if not isinstance(child, nodes.Extends)]
-    return body, replace(ctx, macro_types=types, seen=loaded.seen)
+    inner: list[Line] = []
+    _emit_body(body, inner, indent, replace(ctx, macro_types=types, seen=loaded.seen))
+    out.extend(_mark_foreign(inner, node.lineno))
 
 
 @dataclass(frozen=True)
@@ -733,15 +778,22 @@ def _filter_callable(node: nodes.Filter | nodes.Test) -> str:
     return filters.stub_name(node.name) if node.name in filters.RETURNS else '_tj_any'
 
 
-def filter_imports(tree: nodes.Template, depth: int = 0) -> list[str]:
-    """The names a stub for ``tree`` must import from the generated filter module."""
-    used = {
-        filters.stub_name(node.name)
-        for node in tree.find_all(nodes.Filter)
-        if node.node is not None and node.name in filters.RETURNS
-    }
-    if any(node.node is not None for node in tree.find_all(nodes.Test)):
-        used.add(filters.TEST_STUB)
+def filter_imports(*trees: nodes.Node, depth: int = 0) -> list[str]:
+    """The names a stub must import from the generated filter module.
+
+    Takes every tree contributing statements to the stub, not just the template's own:
+    a base template pulled in through ``extends`` can apply a filter the child never
+    names, and that import would otherwise go missing from the child's preamble.
+    """
+    used: set[str] = set()
+    for tree in trees:
+        used.update(
+            filters.stub_name(node.name)
+            for node in tree.find_all(nodes.Filter)
+            if node.node is not None and node.name in filters.RETURNS
+        )
+        if any(node.node is not None for node in tree.find_all(nodes.Test)):
+            used.add(filters.TEST_STUB)
     module = relative_module(filters.MODULE_NAME, depth)
     return [f'from {module} import {", ".join(sorted(used))}'] if used else []
 
