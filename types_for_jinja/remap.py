@@ -105,7 +105,7 @@ class Remapper:
         for base in bases:
             resolved = (base / candidate).resolve()
             if resolved.is_relative_to(out_dir):
-                key = PurePosixPath(resolved.relative_to(out_dir))
+                key = PurePosixPath(resolved.relative_to(out_dir).as_posix())
                 if key in self._manifest.entries:
                     return key
         return None
