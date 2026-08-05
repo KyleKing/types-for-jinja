@@ -154,7 +154,9 @@ def generate_wrapper(
     """
     style = returns or ReturnStyle()
     name = func_name or _slug(template_name)
-    signature = ', '.join(_declaration(param) for param in header.params)
+    # A bare ``*`` with nothing after it is a syntax error, and a header declaring no
+    # parameters is ordinary: a layout other templates extend takes its context from them.
+    signature = ', '.join(['*', *(_declaration(param) for param in header.params)]) if header.params else ''
     call_kwargs = ', '.join(f'{param.name}={param.name}' for param in header.params)
 
     lines = [
@@ -170,7 +172,7 @@ def generate_wrapper(
         lines.append('@beartype')
     lines.extend(
         [
-            f'def render_{name}(*, {signature}) -> {style.type_name}:',
+            f'def render_{name}({signature}) -> {style.type_name}:',
             f'    """Render {template_name} with a checked context."""',
         ]
     )
