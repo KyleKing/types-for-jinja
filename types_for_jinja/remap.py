@@ -217,7 +217,7 @@ def _location_line(line: str, match: re.Match[str], remapper: Remapper) -> tuple
     if located is None:
         return line, None
     position = f'{located.line}' if raw_column is None else f'{located.line}:{located.column}'
-    rewritten = f'{match.group("indent")}{located.path}:{position}{line[match.end() :]}'
+    rewritten = f'{match.group("indent")}{located.path.as_posix()}:{position}{line[match.end() :]}'
     snippet = _Snippet(
         stub_line=stub_line,
         template_line=located.line,
@@ -246,7 +246,7 @@ def _bare_path_line(line: str, remapper: Remapper) -> str:
     if match is None:
         return line
     located = remapper.locate(match.group('path'), 1, 1)
-    return line if located is None else f'{match.group("indent")}{located.path}'
+    return line if located is None else f'{match.group("indent")}{located.path.as_posix()}'
 
 
 def _remap_github(payload: str, remapper: Remapper) -> str:
@@ -265,7 +265,7 @@ def _annotation_line(line: str, remapper: Remapper) -> str:
     located = remapper.locate(attrs['file'], stub_line, stub_column)
     if located is None:
         return line
-    attrs.update(file=str(located.path), line=str(located.line), col=str(located.column))
+    attrs.update(file=located.path.as_posix(), line=str(located.line), col=str(located.column))
     if 'endLine' in attrs:
         attrs['endLine'] = str(int(attrs['endLine']) + located.line - stub_line)
     if 'endColumn' in attrs:
@@ -290,7 +290,7 @@ def _apply_pyright(entry: dict[str, Any], remapper: Remapper) -> None:
     located = remapper.locate(str(entry['file']), stub_line + 1, stub_character + 1)
     if located is None:
         return
-    entry['file'] = str(located.path)
+    entry['file'] = located.path.as_posix()
     line_shift, character_shift = located.line - 1 - stub_line, located.column - 1 - stub_character
     for position in (start, entry['range'].get('end')):
         if not isinstance(position, dict):
@@ -316,7 +316,7 @@ def _mypy_line(line: str, remapper: Remapper) -> str:
     located = remapper.locate(str(entry['file']), int(entry.get('line', 1)), int(entry.get('column', 0)) + 1)
     if located is None:
         return line
-    entry['file'] = str(located.path)
+    entry['file'] = located.path.as_posix()
     shift = located.line - int(entry.get('line', 1))
     entry['line'] = located.line
     if 'column' in entry:
@@ -348,7 +348,7 @@ def _apply_gitlab(entry: Any, remapper: Remapper) -> None:
     located = remapper.locate(str(location['path']), stub_line, stub_column)
     if located is None:
         return
-    location['path'] = str(located.path)
+    location['path'] = located.path.as_posix()
     if lines:
         lines['begin'] = located.line
         if 'end' in lines:
