@@ -88,7 +88,9 @@ def test_a_real_module_passes_through_untouched(invocation, project, remapper):
     payload = capture(invocation, project)
 
     def own(payload: str) -> list[backends.Location]:
-        return [entry for entry in invocation.locations(payload) if backends.PROJECT_ERROR_PATH in entry[0]]
+        return [
+            entry for entry in invocation.locations(payload) if backends.PROJECT_ERROR_PATH in Path(entry[0]).as_posix()
+        ]
 
     before, after = own(payload), own(remap(payload, remapper))
 

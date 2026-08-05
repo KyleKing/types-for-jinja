@@ -32,7 +32,7 @@ _LOCATION_RE = re.compile(
 _BARE_PATH_RE = re.compile(r'^(?P<indent>\s*)(?P<path>.+?\.pyi?)\s*$')
 _SOURCE_RE = re.compile(r'^(?P<gutter>\s*)(?P<number>\d+)(?P<bar>\s*\|\s?)(?P<text>.*)$')
 _CARET_RE = re.compile(r'^(?P<gutter>\s*\|\s*)(?P<carets>\^+)(?P<rest>.*)$')
-_ANNOTATION_RE = re.compile(r'^::(?P<level>error|warning|notice)\s+(?P<attrs>[^:]*)::(?P<message>.*)$')
+_ANNOTATION_RE = re.compile(r'^::(?P<level>error|warning|notice)\s+(?P<attrs>.*?)::(?P<message>.*)$')
 _IDENTIFIER = re.compile(r'[A-Za-z_][A-Za-z0-9_]*')
 
 FORMATS = ('auto', 'text', 'github', 'pyright-json', 'mypy-json', 'ty-gitlab')
