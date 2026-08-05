@@ -193,10 +193,15 @@ manifest maps each stub back to its template.
 Environment globals such as `static_url` are declared once under
 `[tool.types_for_jinja]` in `pyproject.toml` so they never show up as undefined.
 
-Commit the stubs and a fresh clone type-checks its templates with no
-types-for-jinja run at all.
-Add `types-for-jinja generate --check` to pre-commit or CI to fail when a stub
-is missing or out of date; the shipped pre-commit hook does exactly that.
+Add `_jinja_stubs/` to `.gitignore` and generate the stubs as a step in
+pre-commit or CI rather than committing them; a generated tree does not belong
+in the diff.
+`types-for-jinja generate --check` fails when a stub is missing or out of
+date, and the shipped pre-commit hook runs exactly that check.
+
+If you rename `out_dir`, keep it clear of a leading dot.
+Pyright excludes dot-prefixed directories by default, so a hidden stub tree
+would sit outside every check pyright runs.
 
 Cross-file constructs resolve at generation time:
 a child checks against its whole `{% extends %}` chain, an `{% include %}` body
