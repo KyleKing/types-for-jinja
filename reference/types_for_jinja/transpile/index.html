@@ -408,6 +408,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../docs/CODE_TAG_SUMMARY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Collected Code Tags
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../docs/DEVELOPER_GUIDE/" class="md-nav__link">
         
   
@@ -1843,27 +1871,37 @@ single unsupported construct cannot take down a whole run.</p>
 
 
 <a href="#types_for_jinja.transpile.filter_imports" class="headerlink" title="Permanent link">⚓︎</a></h3>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">filter_imports</span><span class="p">(</span><span class="n">tree</span><span class="p">,</span> <span class="n">depth</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">filter_imports</span><span class="p">(</span><span class="o">*</span><span class="n">trees</span><span class="p">,</span> <span class="n">depth</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>The names a stub for <code>tree</code> must import from the generated filter module.</p>
+        <p>The names a stub must import from the generated filter module.</p>
+<p>Takes every tree contributing statements to the stub, not just the template&rsquo;s own:
+a base template pulled in through <code>extends</code> can apply a filter the child never
+names, and that import would otherwise go missing from the child&rsquo;s preamble.</p>
 
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>types_for_jinja/transpile.py</code></summary>
-              <div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="736 "></span><span class="k">def</span><span class="w"> </span><span class="nf">filter_imports</span><span class="p">(</span><span class="n">tree</span><span class="p">:</span> <span class="n">nodes</span><span class="o">.</span><span class="n">Template</span><span class="p">,</span> <span class="n">depth</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
-<span class="linenos" data-linenos="737 "></span><span class="w">    </span><span class="sd">&quot;&quot;&quot;The names a stub for ``tree`` must import from the generated filter module.&quot;&quot;&quot;</span>
-<span class="linenos" data-linenos="738 "></span>    <span class="n">used</span> <span class="o">=</span> <span class="p">{</span>
-<span class="linenos" data-linenos="739 "></span>        <span class="n">filters</span><span class="o">.</span><span class="n">stub_name</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
-<span class="linenos" data-linenos="740 "></span>        <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">tree</span><span class="o">.</span><span class="n">find_all</span><span class="p">(</span><span class="n">nodes</span><span class="o">.</span><span class="n">Filter</span><span class="p">)</span>
-<span class="linenos" data-linenos="741 "></span>        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">node</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="n">filters</span><span class="o">.</span><span class="n">RETURNS</span>
-<span class="linenos" data-linenos="742 "></span>    <span class="p">}</span>
-<span class="linenos" data-linenos="743 "></span>    <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">node</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">tree</span><span class="o">.</span><span class="n">find_all</span><span class="p">(</span><span class="n">nodes</span><span class="o">.</span><span class="n">Test</span><span class="p">)):</span>
-<span class="linenos" data-linenos="744 "></span>        <span class="n">used</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">filters</span><span class="o">.</span><span class="n">TEST_STUB</span><span class="p">)</span>
-<span class="linenos" data-linenos="745 "></span>    <span class="n">module</span> <span class="o">=</span> <span class="n">relative_module</span><span class="p">(</span><span class="n">filters</span><span class="o">.</span><span class="n">MODULE_NAME</span><span class="p">,</span> <span class="n">depth</span><span class="p">)</span>
-<span class="linenos" data-linenos="746 "></span>    <span class="k">return</span> <span class="p">[</span><span class="sa">f</span><span class="s1">&#39;from </span><span class="si">{</span><span class="n">module</span><span class="si">}</span><span class="s1"> import </span><span class="si">{</span><span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">used</span><span class="p">))</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">]</span> <span class="k">if</span> <span class="n">used</span> <span class="k">else</span> <span class="p">[]</span>
+              <div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="781 "></span><span class="k">def</span><span class="w"> </span><span class="nf">filter_imports</span><span class="p">(</span><span class="o">*</span><span class="n">trees</span><span class="p">:</span> <span class="n">nodes</span><span class="o">.</span><span class="n">Node</span><span class="p">,</span> <span class="n">depth</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="linenos" data-linenos="782 "></span><span class="w">    </span><span class="sd">&quot;&quot;&quot;The names a stub must import from the generated filter module.</span>
+<span class="linenos" data-linenos="783 "></span>
+<span class="linenos" data-linenos="784 "></span><span class="sd">    Takes every tree contributing statements to the stub, not just the template&#39;s own:</span>
+<span class="linenos" data-linenos="785 "></span><span class="sd">    a base template pulled in through ``extends`` can apply a filter the child never</span>
+<span class="linenos" data-linenos="786 "></span><span class="sd">    names, and that import would otherwise go missing from the child&#39;s preamble.</span>
+<span class="linenos" data-linenos="787 "></span><span class="sd">    &quot;&quot;&quot;</span>
+<span class="linenos" data-linenos="788 "></span>    <span class="n">used</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+<span class="linenos" data-linenos="789 "></span>    <span class="k">for</span> <span class="n">tree</span> <span class="ow">in</span> <span class="n">trees</span><span class="p">:</span>
+<span class="linenos" data-linenos="790 "></span>        <span class="n">used</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+<span class="linenos" data-linenos="791 "></span>            <span class="n">filters</span><span class="o">.</span><span class="n">stub_name</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+<span class="linenos" data-linenos="792 "></span>            <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">tree</span><span class="o">.</span><span class="n">find_all</span><span class="p">(</span><span class="n">nodes</span><span class="o">.</span><span class="n">Filter</span><span class="p">)</span>
+<span class="linenos" data-linenos="793 "></span>            <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">node</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="n">filters</span><span class="o">.</span><span class="n">RETURNS</span>
+<span class="linenos" data-linenos="794 "></span>        <span class="p">)</span>
+<span class="linenos" data-linenos="795 "></span>        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">node</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">tree</span><span class="o">.</span><span class="n">find_all</span><span class="p">(</span><span class="n">nodes</span><span class="o">.</span><span class="n">Test</span><span class="p">)):</span>
+<span class="linenos" data-linenos="796 "></span>            <span class="n">used</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">filters</span><span class="o">.</span><span class="n">TEST_STUB</span><span class="p">)</span>
+<span class="linenos" data-linenos="797 "></span>    <span class="n">module</span> <span class="o">=</span> <span class="n">relative_module</span><span class="p">(</span><span class="n">filters</span><span class="o">.</span><span class="n">MODULE_NAME</span><span class="p">,</span> <span class="n">depth</span><span class="p">)</span>
+<span class="linenos" data-linenos="798 "></span>    <span class="k">return</span> <span class="p">[</span><span class="sa">f</span><span class="s1">&#39;from </span><span class="si">{</span><span class="n">module</span><span class="si">}</span><span class="s1"> import </span><span class="si">{</span><span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">used</span><span class="p">))</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">]</span> <span class="k">if</span> <span class="n">used</span> <span class="k">else</span> <span class="p">[]</span>
 </code></pre></div>
             </details>
     </div>
@@ -1978,7 +2016,7 @@ on its relative import of the generated filter signatures.</p>
 <span class="linenos" data-linenos="174 "></span>    <span class="n">lines</span> <span class="o">=</span> <span class="n">_preamble</span><span class="p">(</span>
 <span class="linenos" data-linenos="175 "></span>        <span class="n">header</span><span class="p">,</span>
 <span class="linenos" data-linenos="176 "></span>        <span class="n">config</span><span class="p">,</span>
-<span class="linenos" data-linenos="177 "></span>        <span class="p">[</span><span class="o">*</span><span class="n">macro_imports</span><span class="p">,</span> <span class="o">*</span><span class="n">split</span><span class="o">.</span><span class="n">imports</span><span class="p">,</span> <span class="o">*</span><span class="n">filter_imports</span><span class="p">(</span><span class="n">tree</span><span class="p">,</span> <span class="n">depth</span><span class="p">)],</span>
+<span class="linenos" data-linenos="177 "></span>        <span class="p">[</span><span class="o">*</span><span class="n">macro_imports</span><span class="p">,</span> <span class="o">*</span><span class="n">split</span><span class="o">.</span><span class="n">imports</span><span class="p">,</span> <span class="o">*</span><span class="n">filter_imports</span><span class="p">(</span><span class="n">tree</span><span class="p">,</span> <span class="o">*</span><span class="n">split</span><span class="o">.</span><span class="n">base_nodes</span><span class="p">,</span> <span class="n">depth</span><span class="o">=</span><span class="n">depth</span><span class="p">)],</span>
 <span class="linenos" data-linenos="178 "></span>        <span class="n">_jinja_globals</span><span class="p">(</span><span class="n">tree</span><span class="p">,</span> <span class="n">config</span><span class="p">),</span>
 <span class="linenos" data-linenos="179 "></span>    <span class="p">)</span>
 <span class="linenos" data-linenos="180 "></span>    <span class="n">preamble_len</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">lines</span><span class="p">)</span>

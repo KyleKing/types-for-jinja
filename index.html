@@ -641,6 +641,34 @@
   
   
     <li class="md-nav__item">
+      <a href="docs/CODE_TAG_SUMMARY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Collected Code Tags
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="docs/DEVELOPER_GUIDE/" class="md-nav__link">
         
   
@@ -1696,10 +1724,14 @@ is mangled, because a module name cannot carry a template extension), and a
 manifest maps each stub back to its template.
 Environment globals such as <code>static_url</code> are declared once under
 <code>[tool.types_for_jinja]</code> in <code>pyproject.toml</code> so they never show up as undefined.</p>
-<p>Commit the stubs and a fresh clone type-checks its templates with no
-types-for-jinja run at all.
-Add <code>types-for-jinja generate --check</code> to pre-commit or CI to fail when a stub
-is missing or out of date; the shipped pre-commit hook does exactly that.</p>
+<p>Add <code>_jinja_stubs/</code> to <code>.gitignore</code> and generate the stubs as a step in
+pre-commit or CI rather than committing them; a generated tree does not belong
+in the diff.
+<code>types-for-jinja generate --check</code> fails when a stub is missing or out of
+date, and the shipped pre-commit hook runs exactly that check.</p>
+<p>If you rename <code>out_dir</code>, keep it clear of a leading dot.
+Pyright excludes dot-prefixed directories by default, so a hidden stub tree
+would sit outside every check pyright runs.</p>
 <p>Cross-file constructs resolve at generation time:
 a child checks against its whole <code>{% extends %}</code> chain, an <code>{% include %}</code> body
 checks against the including template&rsquo;s context, and <code>{% import %}</code>-ed macros

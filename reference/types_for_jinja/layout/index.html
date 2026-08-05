@@ -408,6 +408,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../docs/CODE_TAG_SUMMARY/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Collected Code Tags
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../docs/DEVELOPER_GUIDE/" class="md-nav__link">
         
   
@@ -1395,19 +1423,19 @@ the local tag is the only position in this template that means anything.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>types_for_jinja/layout.py</code></summary>
-                <div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="36 "></span><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="linenos" data-linenos="37 "></span><span class="k">class</span><span class="w"> </span><span class="nc">AlignedModule</span><span class="p">:</span>
-<span class="linenos" data-linenos="38 "></span><span class="w">    </span><span class="sd">&quot;&quot;&quot;A line-aligned stub plus the sidecar holding definitions from other templates.</span>
-<span class="linenos" data-linenos="39 "></span>
-<span class="linenos" data-linenos="40 "></span><span class="sd">    ``sidecar_line`` is the template line the whole sidecar is attributed to, which is the</span>
-<span class="linenos" data-linenos="41 "></span><span class="sd">    ``{% extends %}`` or ``{% include %}`` tag that pulled the other file in. A sidecar cannot</span>
-<span class="linenos" data-linenos="42 "></span><span class="sd">    be line-aligned, because its statements come from a file with different line numbers, so</span>
-<span class="linenos" data-linenos="43 "></span><span class="sd">    the local tag is the only position in this template that means anything.</span>
-<span class="linenos" data-linenos="44 "></span><span class="sd">    &quot;&quot;&quot;</span>
-<span class="linenos" data-linenos="45 "></span>
-<span class="linenos" data-linenos="46 "></span>    <span class="n">code</span><span class="p">:</span> <span class="nb">str</span>
-<span class="linenos" data-linenos="47 "></span>    <span class="n">sidecar</span><span class="p">:</span> <span class="nb">str</span>
-<span class="linenos" data-linenos="48 "></span>    <span class="n">sidecar_line</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span>
+                <div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="41 "></span><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="linenos" data-linenos="42 "></span><span class="k">class</span><span class="w"> </span><span class="nc">AlignedModule</span><span class="p">:</span>
+<span class="linenos" data-linenos="43 "></span><span class="w">    </span><span class="sd">&quot;&quot;&quot;A line-aligned stub plus the sidecar holding definitions from other templates.</span>
+<span class="linenos" data-linenos="44 "></span>
+<span class="linenos" data-linenos="45 "></span><span class="sd">    ``sidecar_line`` is the template line the whole sidecar is attributed to, which is the</span>
+<span class="linenos" data-linenos="46 "></span><span class="sd">    ``{% extends %}`` or ``{% include %}`` tag that pulled the other file in. A sidecar cannot</span>
+<span class="linenos" data-linenos="47 "></span><span class="sd">    be line-aligned, because its statements come from a file with different line numbers, so</span>
+<span class="linenos" data-linenos="48 "></span><span class="sd">    the local tag is the only position in this template that means anything.</span>
+<span class="linenos" data-linenos="49 "></span><span class="sd">    &quot;&quot;&quot;</span>
+<span class="linenos" data-linenos="50 "></span>
+<span class="linenos" data-linenos="51 "></span>    <span class="n">code</span><span class="p">:</span> <span class="nb">str</span>
+<span class="linenos" data-linenos="52 "></span>    <span class="n">sidecar</span><span class="p">:</span> <span class="nb">str</span>
+<span class="linenos" data-linenos="53 "></span>    <span class="n">sidecar_line</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span>
 </code></pre></div>
               </details>
 
@@ -1460,8 +1488,8 @@ the local tag is the only position in this template that means anything.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>types_for_jinja/layout.py</code></summary>
-                <div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="32 "></span><span class="k">class</span><span class="w"> </span><span class="nc">LayoutError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
-<span class="linenos" data-linenos="33 "></span><span class="w">    </span><span class="sd">&quot;&quot;&quot;The emitted statements have no line-aligned Python form.&quot;&quot;&quot;</span>
+                <div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="37 "></span><span class="k">class</span><span class="w"> </span><span class="nc">LayoutError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+<span class="linenos" data-linenos="38 "></span><span class="w">    </span><span class="sd">&quot;&quot;&quot;The emitted statements have no line-aligned Python form.&quot;&quot;&quot;</span>
 </code></pre></div>
               </details>
 
@@ -1488,12 +1516,12 @@ the local tag is the only position in this template that means anything.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>types_for_jinja/layout.py</code></summary>
-              <div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="51 "></span><span class="k">def</span><span class="w"> </span><span class="nf">layout</span><span class="p">(</span><span class="n">module</span><span class="p">:</span> <span class="n">GeneratedModule</span><span class="p">,</span> <span class="n">header</span><span class="p">:</span> <span class="n">TemplateHeader</span><span class="p">,</span> <span class="n">sidecar_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AlignedModule</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="linenos" data-linenos="52 "></span><span class="w">    </span><span class="sd">&quot;&quot;&quot;Align ``module`` to its template&#39;s lines, or return ``None`` if it has no aligned form.&quot;&quot;&quot;</span>
-<span class="linenos" data-linenos="53 "></span>    <span class="k">try</span><span class="p">:</span>
-<span class="linenos" data-linenos="54 "></span>        <span class="k">return</span> <span class="n">_layout</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">header</span><span class="p">,</span> <span class="n">sidecar_name</span><span class="p">)</span>
-<span class="linenos" data-linenos="55 "></span>    <span class="k">except</span> <span class="n">LayoutError</span><span class="p">:</span>
-<span class="linenos" data-linenos="56 "></span>        <span class="k">return</span> <span class="kc">None</span>
+              <div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="56 "></span><span class="k">def</span><span class="w"> </span><span class="nf">layout</span><span class="p">(</span><span class="n">module</span><span class="p">:</span> <span class="n">GeneratedModule</span><span class="p">,</span> <span class="n">header</span><span class="p">:</span> <span class="n">TemplateHeader</span><span class="p">,</span> <span class="n">sidecar_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AlignedModule</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="linenos" data-linenos="57 "></span><span class="w">    </span><span class="sd">&quot;&quot;&quot;Align ``module`` to its template&#39;s lines, or return ``None`` if it has no aligned form.&quot;&quot;&quot;</span>
+<span class="linenos" data-linenos="58 "></span>    <span class="k">try</span><span class="p">:</span>
+<span class="linenos" data-linenos="59 "></span>        <span class="k">return</span> <span class="n">_layout</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">header</span><span class="p">,</span> <span class="n">sidecar_name</span><span class="p">)</span>
+<span class="linenos" data-linenos="60 "></span>    <span class="k">except</span> <span class="n">LayoutError</span><span class="p">:</span>
+<span class="linenos" data-linenos="61 "></span>        <span class="k">return</span> <span class="kc">None</span>
 </code></pre></div>
             </details>
     </div>
