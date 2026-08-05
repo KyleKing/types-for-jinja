@@ -2,6 +2,12 @@
 
 ### Feat
 
+- **transpile**: check a typed {% include %} as a parameterized call
+
+## 1.0.0 (2026-08-04)
+
+### Feat
+
 - **emit**: mangle templated directory names so Copier and Cookiecutter check
 - **cli**: broaden template discovery and default to template_dirs
 - **transpile**: check templates that use namespace() and Jinja's globals
