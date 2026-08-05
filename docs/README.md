@@ -318,8 +318,34 @@ validator = "beartype"
 
 `template_dirs` is what makes the generated `get_template()` argument match the
 name your loader uses.
-Run `types-for-jinja wrapper --check` in CI or a pre-commit hook to fail when a
-generated wrapper no longer matches its template.
+
+### Stubs and wrappers are different artifacts
+
+The two commands look alike and are not interchangeable, so it is worth being
+explicit about which is which:
+
+|                    | `generate`                                               | `wrapper`                                           |
+| ------------------ | -------------------------------------------------------- | --------------------------------------------------- |
+| Writes             | stub modules under `out_dir` (`_jinja_stubs` by default) | importable render functions under `wrapper.out_dir` |
+| Read by            | your type checker, and nothing else                      | your application, at runtime                        |
+| In version control | no, gitignore it                                         | your call, see below                                |
+
+Both are generated code, so treating them the same way is the least surprising
+setup:
+gitignore each `out_dir` and build them as a step in test, CI, and
+deploy.
+Nothing generated reaches a review diff, and nothing can go stale
+because it is rebuilt before it is used.
+
+Committing the wrappers instead is a reasonable trade for a project that wants a
+clone to run without a build step.
+It costs generated code in your diffs and one
+more thing to keep current, so run `types-for-jinja wrapper --check` in CI or a
+pre-commit hook when you take it.
+
+Either way `wrapper` removes the wrappers whose templates are gone, the same way
+`generate` prunes stubs, so a rename cannot leave behind a function that renders
+a template no longer on disk.
 
 Web apps usually return a response rather than `Markup`.
 Point `--return-type` and `--return-import` (or `return_type` and

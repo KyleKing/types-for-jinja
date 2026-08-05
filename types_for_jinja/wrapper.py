@@ -9,12 +9,13 @@ either a ``@beartype`` guard (check, non-transforming) or a Pydantic ``TypeAdapt
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import Path
+from dataclasses import dataclass, field
+from pathlib import Path, PurePosixPath
 from typing import Literal
 
+from types_for_jinja import manifest
 from types_for_jinja.config import Config, WrapperConfig, load_config
-from types_for_jinja.emit import mirrored_path, package_markers
+from types_for_jinja.emit import mirrored_path, package_markers, stale_files, write_files
 from types_for_jinja.header import Param, TemplateHeader, header_errors, parse_header
 from types_for_jinja.resolve import search_paths
 
@@ -36,14 +37,21 @@ class Wrappers:
 
     files: dict[Path, str]
     skipped: list[tuple[Path, str]]
+    out_dir: Path = Path()
+    entries: dict[PurePosixPath, manifest.Entry] = field(default_factory=dict)
+    decided: set[PurePosixPath] = field(default_factory=set)
 
 
 def build_wrappers(templates: list[Path], out_dir: Path, config: Config | None = None) -> Wrappers:
     """Generate a typed render wrapper per template, laid out under ``out_dir``."""
     resolved = config or load_config(Path.cwd())
+    root = Path.cwd()
     files: dict[Path, str] = {}
     skipped: list[tuple[Path, str]] = []
+    entries: dict[PurePosixPath, manifest.Entry] = {}
+    decided: set[PurePosixPath] = set()
     for template in templates:
+        decided.add(manifest.relative(template, root))
         source = template.read_text(encoding='utf-8')
         header = parse_header(source, resolved.syntax)
         if header is None:
@@ -61,8 +69,52 @@ def build_wrappers(templates: list[Path], out_dir: Path, config: Config | None =
             env_import=resolved.wrapper.env_import,
             returns=ReturnStyle(resolved.wrapper.return_type, resolved.wrapper.return_import),
         )
-        files.update(package_markers(out_dir, path))
-    return Wrappers(files=files, skipped=skipped)
+        markers = package_markers(out_dir, path)
+        files.update(markers)
+        entries[manifest.relative(path, out_dir)] = manifest.Entry(
+            template=manifest.relative(template, root),
+            aligned=False,
+            support=tuple(sorted(manifest.relative(marker, out_dir) for marker in markers)),
+        )
+    return Wrappers(files=files, skipped=skipped, out_dir=out_dir, entries=entries, decided=decided)
+
+
+def plan(wrappers: Wrappers) -> tuple[dict[Path, str], list[Path]]:
+    """Return the files this run writes and the wrappers it removes.
+
+    A renamed or deleted template otherwise leaves its wrapper importable, so application
+    code keeps rendering a template that no longer exists. The manifest joins the write set
+    so ``--check`` also fails on a tree whose bookkeeping has drifted.
+    """
+    out_dir = wrappers.out_dir
+    previous = manifest.load(out_dir)
+    merged = manifest.merge(previous, manifest.Manifest(entries=wrappers.entries), wrappers.decided)
+    files = {**wrappers.files, out_dir / manifest.MANIFEST_NAME: manifest.dumps(merged)}
+    return files, manifest.orphans(previous, merged, out_dir)
+
+
+def write(wrappers: Wrappers) -> list[Path]:
+    """Write every wrapper and delete orphaned ones, returning the paths that changed."""
+    files, removed = plan(wrappers)
+    for path in removed:
+        path.unlink(missing_ok=True)
+    changed = write_files(files)
+    _prune_empty_dirs({path.parent for path in removed}, wrappers.out_dir)
+    return changed + [path for path in removed if not path.is_file()]
+
+
+def stale(wrappers: Wrappers) -> list[Path]:
+    """Return the paths whose on-disk state no longer matches what this run would produce."""
+    files, removed = plan(wrappers)
+    return stale_files(files) + [path for path in removed if path.is_file()]
+
+
+def _prune_empty_dirs(candidates: set[Path], out_dir: Path) -> None:
+    for directory in sorted(candidates, key=lambda path: len(path.parts), reverse=True):
+        current = directory
+        while current != out_dir and out_dir in current.parents and current.is_dir() and not any(current.iterdir()):
+            current.rmdir()
+            current = current.parent
 
 
 def template_name(template: Path, config: Config) -> str:
