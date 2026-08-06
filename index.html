@@ -388,6 +388,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#stubs-and-wrappers-are-different-artifacts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stubs and wrappers are different artifacts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#runtime-checking" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1443,6 +1454,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#stubs-and-wrappers-are-different-artifacts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stubs and wrappers are different artifacts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#runtime-checking" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1872,9 +1894,50 @@ whose body calls Jinja unchanged:</p>
 <span class="linenos" data-linenos="7 "></span><span class="n">validator</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;beartype&quot;</span>
 </code></pre></div>
 <p><code>template_dirs</code> is what makes the generated <code>get_template()</code> argument match the
-name your loader uses.
-Run <code>types-for-jinja wrapper --check</code> in CI or a pre-commit hook to fail when a
-generated wrapper no longer matches its template.</p>
+name your loader uses.</p>
+<h3 id="stubs-and-wrappers-are-different-artifacts">Stubs and wrappers are different artifacts<a class="headerlink" href="#stubs-and-wrappers-are-different-artifacts" title="Permanent link">⚓︎</a></h3>
+<p>The two commands look alike and are not interchangeable, so it is worth being
+explicit about which is which:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><code>generate</code></th>
+<th><code>wrapper</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Writes</td>
+<td>stub modules under <code>out_dir</code> (<code>_jinja_stubs</code> by default)</td>
+<td>importable render functions under <code>wrapper.out_dir</code></td>
+</tr>
+<tr>
+<td>Read by</td>
+<td>your type checker, and nothing else</td>
+<td>your application, at runtime</td>
+</tr>
+<tr>
+<td>In version control</td>
+<td>no, gitignore it</td>
+<td>your call, see below</td>
+</tr>
+</tbody>
+</table>
+<p>Both are generated code, so treating them the same way is the least surprising
+setup:
+gitignore each <code>out_dir</code> and build them as a step in test, CI, and
+deploy.
+Nothing generated reaches a review diff, and nothing can go stale
+because it is rebuilt before it is used.</p>
+<p>Committing the wrappers instead is a reasonable trade for a project that wants a
+clone to run without a build step.
+It costs generated code in your diffs and one
+more thing to keep current, so run <code>types-for-jinja wrapper --check</code> in CI or a
+pre-commit hook when you take it.</p>
+<p>Either way <code>wrapper</code> removes the wrappers whose templates are gone, the same way
+<code>generate</code> prunes stubs, so a rename cannot leave behind a function that renders
+a template no longer on disk.</p>
 <p>Web apps usually return a response rather than <code>Markup</code>.
 Point <code>--return-type</code> and <code>--return-import</code> (or <code>return_type</code> and
 <code>return_import</code> in the config) at your framework&rsquo;s class and the wrapper calls
