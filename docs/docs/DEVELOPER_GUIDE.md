@@ -73,7 +73,7 @@ uv publish
 |------------------------------------------------|-----------:|--------:|---------:|---------:|
 | `types_for_jinja/__init__.py`                  | 4          | 0       | 0        | 100.0%   |
 | `types_for_jinja/_runtime_type_check_setup.py` | 13         | 0       | 37       | 100.0%   |
-| `types_for_jinja/cli.py`                       | 105        | 11      | 0        | 87.2%    |
+| `types_for_jinja/cli.py`                       | 108        | 11      | 0        | 87.5%    |
 | `types_for_jinja/complete.py`                  | 194        | 14      | 0        | 89.8%    |
 | `types_for_jinja/components.py`                | 104        | 4       | 0        | 94.3%    |
 | `types_for_jinja/config.py`                    | 72         | 0       | 0        | 100.0%   |
@@ -90,8 +90,8 @@ uv publish
 | `types_for_jinja/resolve.py`                   | 21         | 2       | 0        | 92.6%    |
 | `types_for_jinja/suppress.py`                  | 26         | 0       | 0        | 100.0%   |
 | `types_for_jinja/transpile.py`                 | 461        | 55      | 0        | 85.9%    |
-| `types_for_jinja/wrapper.py`                   | 92         | 2       | 0        | 96.6%    |
-| **Totals**                                     | 2213       | 159     | 39       | 90.2%    |
+| `types_for_jinja/wrapper.py`                   | 124        | 3       | 0        | 96.2%    |
+| **Totals**                                     | 2248       | 160     | 39       | 90.2%    |
 
-Generated on: 2026-08-05
+Generated on: 2026-08-12
 <!-- {cte} -->

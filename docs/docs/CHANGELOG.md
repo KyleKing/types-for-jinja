@@ -1,5 +1,14 @@
 ## Unreleased
 
+### Fix
+
+- **wrapper**: emit a valid signature for a header with no parameters
+- **cli**: count the manifest in the wrapper write total
+- **wrapper**: prune the wrappers whose templates are gone
+- convert Path to PurePosixPath via as_posix on Windows (#1)
+
+## 1.1.0 (2026-08-05)
+
 ### Feat
 
 - **transpile**: check a typed {% include %} as a parameterized call
