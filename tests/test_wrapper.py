@@ -149,6 +149,7 @@ def test_a_default_survives_the_pydantic_validator():
 def test_a_header_with_no_parameters_generates_parseable_source():
     """A layout other templates extend declares nothing, and `def f(*, )` is a syntax error."""
     header = parse_header('{#def\n#}\n<p>hi</p>\n', None)
+    assert header is not None
 
     source = generate_wrapper(header, 'base.html.jinja')
 
