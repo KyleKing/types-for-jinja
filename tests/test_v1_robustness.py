@@ -56,6 +56,17 @@ def test_generate_skips_a_broken_template_and_keeps_going(project, capsys):
     assert (Path(_STUB_DIR) / 'templates/page_html_jinja.py').is_file()
 
 
+def test_generate_skips_a_header_it_cannot_read(project, capsys):
+    """Stubbing without the declarations sends the checker after every use in the body instead."""
+    write_template('templates/vague.html.jinja', '{#def x: int y: int #}\n{{ x }}\n')
+
+    code = main(['generate', 'templates', '-o', _STUB_DIR])
+
+    assert code == 0
+    assert 'not a valid parameter list' in capsys.readouterr().err
+    assert not (Path(_STUB_DIR) / 'templates/vague_html_jinja.py').is_file()
+
+
 def test_generate_check_reports_a_missing_stub(project):
     assert main(['generate', 'templates', '-o', _STUB_DIR, '--check']) == 1
 

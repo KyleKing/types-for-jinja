@@ -199,6 +199,11 @@ def _stub_for(template: Path, out_dir: Path, config: Config, override: str | Non
     header = parse_header(source, config.syntax)
     if header is None:
         return 'no {#def ... #} type header'
+    if malformed := header_errors(header):
+        # A header this cannot read declares no parameters, and a stub missing them
+        # sends the checker after every use in the body instead of at the one line
+        # that is actually wrong.
+        return malformed[0]
     stub_path = mirrored_path(template, out_dir)
     depth = depth_of(stub_path, out_dir)
     try:
