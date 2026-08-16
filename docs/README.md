@@ -182,6 +182,35 @@ way.
 
 ## How it works
 
+```mermaid
+flowchart LR
+    tpl["Templates<br/>(def headers)"]
+    cfg["pyproject.toml<br/>tool.types_for_jinja"]
+
+    gen["generate"]
+    wrp["wrapper"]
+    lsp["types-for-jinja-lsp"]
+
+    stubs["Line-aligned stubs<br/>+ manifest"]
+    calls["Render functions"]
+
+    chk["Your checker<br/>pyright / ty / mypy"]
+    rmp["remap"]
+
+    ci["CI output at the<br/>template path and line"]
+    ed["Inline diagnostics in<br/>the template buffer"]
+
+    tpl --> gen & wrp & lsp
+    cfg --> gen & wrp & lsp
+    gen --> stubs
+    lsp -- "on edit, debounced" --> stubs
+    wrp --> calls
+    stubs --> chk
+    calls --> chk
+    chk --> rmp --> ci
+    chk -- "editor mirror" --> ed
+```
+
 `types-for-jinja generate` parses each template with Jinja's own parser and
 writes a small Python module that exercises every expression the template uses,
 preserving nesting so your checker's scoping and narrowing mirror Jinja's.
