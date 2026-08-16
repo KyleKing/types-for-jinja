@@ -1736,6 +1736,32 @@ pyright, ty, and mypy are each verified against the generated stubs on every CI
 run, and anything that reads standard Python annotations should work the same
 way.</p>
 <h2 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">⚓︎</a></h2>
+<pre class="mermaid"><code>flowchart LR
+    tpl["Templates&lt;br/&gt;(def headers)"]
+    cfg["pyproject.toml&lt;br/&gt;tool.types_for_jinja"]
+
+    gen["generate"]
+    wrp["wrapper"]
+    lsp["types-for-jinja-lsp"]
+
+    stubs["Line-aligned stubs&lt;br/&gt;+ manifest"]
+    calls["Render functions"]
+
+    chk["Your checker&lt;br/&gt;pyright / ty / mypy"]
+    rmp["remap"]
+
+    ci["CI output at the&lt;br/&gt;template path and line"]
+    ed["Inline diagnostics in&lt;br/&gt;the template buffer"]
+
+    tpl --&gt; gen &amp; wrp &amp; lsp
+    cfg --&gt; gen &amp; wrp &amp; lsp
+    gen --&gt; stubs
+    lsp -- "on edit, debounced" --&gt; stubs
+    wrp --&gt; calls
+    stubs --&gt; chk
+    calls --&gt; chk
+    chk --&gt; rmp --&gt; ci
+    chk -- "editor mirror" --&gt; ed</code></pre>
 <p><code>types-for-jinja generate</code> parses each template with Jinja&rsquo;s own parser and
 writes a small Python module that exercises every expression the template uses,
 preserving nesting so your checker&rsquo;s scoping and narrowing mirror Jinja&rsquo;s.

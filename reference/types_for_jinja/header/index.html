@@ -1773,20 +1773,20 @@ comment pattern but no longer parses as a declaration list, which this catches.<
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>types_for_jinja/header.py</code></summary>
-              <div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="136 "></span><span class="k">def</span><span class="w"> </span><span class="nf">header_errors</span><span class="p">(</span><span class="n">header</span><span class="p">:</span> <span class="n">TemplateHeader</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
-<span class="linenos" data-linenos="137 "></span><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return messages for header entries that are not valid Python, empty when the header is sound.</span>
-<span class="linenos" data-linenos="138 "></span>
-<span class="linenos" data-linenos="139 "></span><span class="sd">    A formatter that collapses the header onto one line produces text that still matches the</span>
-<span class="linenos" data-linenos="140 "></span><span class="sd">    comment pattern but no longer parses as a declaration list, which this catches.</span>
-<span class="linenos" data-linenos="141 "></span><span class="sd">    &quot;&quot;&quot;</span>
-<span class="linenos" data-linenos="142 "></span>    <span class="n">messages</span> <span class="o">=</span> <span class="p">[</span>
-<span class="linenos" data-linenos="143 "></span>        <span class="sa">f</span><span class="s1">&#39;malformed import in </span><span class="se">{{</span><span class="s1">#def #</span><span class="se">}}</span><span class="s1"> header: </span><span class="si">{</span><span class="n">statement</span><span class="si">!r}</span><span class="s1"> (one import per line)&#39;</span>
-<span class="linenos" data-linenos="144 "></span>        <span class="k">for</span> <span class="n">statement</span> <span class="ow">in</span> <span class="n">header</span><span class="o">.</span><span class="n">imports</span>
-<span class="linenos" data-linenos="145 "></span>        <span class="k">if</span> <span class="ow">not</span> <span class="n">_parses</span><span class="p">(</span><span class="n">statement</span><span class="p">)</span>
-<span class="linenos" data-linenos="146 "></span>    <span class="p">]</span>
-<span class="linenos" data-linenos="147 "></span>    <span class="k">if</span> <span class="n">header</span><span class="o">.</span><span class="n">malformed</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-<span class="linenos" data-linenos="148 "></span>        <span class="n">messages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">header</span><span class="o">.</span><span class="n">malformed</span><span class="p">)</span>
-<span class="linenos" data-linenos="149 "></span>    <span class="k">return</span> <span class="n">messages</span>
+              <div class="highlight"><pre><span></span><code><span class="linenos" data-linenos="146 "></span><span class="k">def</span><span class="w"> </span><span class="nf">header_errors</span><span class="p">(</span><span class="n">header</span><span class="p">:</span> <span class="n">TemplateHeader</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="linenos" data-linenos="147 "></span><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return messages for header entries that are not valid Python, empty when the header is sound.</span>
+<span class="linenos" data-linenos="148 "></span>
+<span class="linenos" data-linenos="149 "></span><span class="sd">    A formatter that collapses the header onto one line produces text that still matches the</span>
+<span class="linenos" data-linenos="150 "></span><span class="sd">    comment pattern but no longer parses as a declaration list, which this catches.</span>
+<span class="linenos" data-linenos="151 "></span><span class="sd">    &quot;&quot;&quot;</span>
+<span class="linenos" data-linenos="152 "></span>    <span class="n">messages</span> <span class="o">=</span> <span class="p">[</span>
+<span class="linenos" data-linenos="153 "></span>        <span class="sa">f</span><span class="s1">&#39;malformed import in </span><span class="se">{{</span><span class="s1">#def #</span><span class="se">}}</span><span class="s1"> header: </span><span class="si">{</span><span class="n">statement</span><span class="si">!r}</span><span class="s1"> (one import per line)&#39;</span>
+<span class="linenos" data-linenos="154 "></span>        <span class="k">for</span> <span class="n">statement</span> <span class="ow">in</span> <span class="n">header</span><span class="o">.</span><span class="n">imports</span>
+<span class="linenos" data-linenos="155 "></span>        <span class="k">if</span> <span class="ow">not</span> <span class="n">_parses</span><span class="p">(</span><span class="n">statement</span><span class="p">)</span>
+<span class="linenos" data-linenos="156 "></span>    <span class="p">]</span>
+<span class="linenos" data-linenos="157 "></span>    <span class="k">if</span> <span class="n">header</span><span class="o">.</span><span class="n">malformed</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+<span class="linenos" data-linenos="158 "></span>        <span class="n">messages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">header</span><span class="o">.</span><span class="n">malformed</span><span class="p">)</span>
+<span class="linenos" data-linenos="159 "></span>    <span class="k">return</span> <span class="n">messages</span>
 </code></pre></div>
             </details>
     </div>
