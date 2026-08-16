@@ -2,6 +2,12 @@
 
 ### Fix
 
+- **generate**: skip a template whose header cannot be read
+
+## 1.1.2 (2026-08-15)
+
+### Fix
+
 - **header**: accept a defaulted declaration before an undefaulted one
 
 ## 1.1.1 (2026-08-12)
