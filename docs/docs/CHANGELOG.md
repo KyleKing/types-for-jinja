@@ -2,6 +2,12 @@
 
 ### Fix
 
+- **header**: accept a defaulted declaration before an undefaulted one
+
+## 1.1.1 (2026-08-12)
+
+### Fix
+
 - **wrapper**: emit a valid signature for a header with no parameters
 - **cli**: count the manifest in the wrapper write total
 - **wrapper**: prune the wrappers whose templates are gone
