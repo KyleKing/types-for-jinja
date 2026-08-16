@@ -104,17 +104,27 @@ def _parse_params(text: str) -> tuple[list[Param], str | None]:
     declaration per line, as this project's docs show, and the comma-separated one-liner with
     defaults and untyped names that JinjaX writes. Anything Python would reject is reported
     rather than half-read.
+
+    The retry behind a bare ``*`` accepts a defaulted declaration before an undefaulted one,
+    which a template may write in whatever order reads best because every generated parameter
+    is keyword-only.
     """
     if not text:
         return [], None
-    try:
-        tree = ast.parse(f'def _tj({text}): pass')
-    except SyntaxError:
+    tree = _parse_signature(text) or _parse_signature(f'*, {text}')
+    if tree is None:
         return [], f'malformed {{#def #}} header: {text!r} is not a valid parameter list'
     function = tree.body[0]
     if not isinstance(function, ast.FunctionDef):  # pragma: no cover
         return [], f'malformed {{#def #}} header: {text!r}'
     return _params_of(function.args), None
+
+
+def _parse_signature(text: str) -> ast.Module | None:
+    try:
+        return ast.parse(f'def _tj({text}): pass')
+    except SyntaxError:
+        return None
 
 
 def _params_of(args: ast.arguments) -> list[Param]:

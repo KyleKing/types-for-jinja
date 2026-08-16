@@ -93,6 +93,15 @@ def test_the_two_forms_mix():
     assert header.params[2].default == "'post'"
 
 
+def test_a_defaulted_declaration_may_precede_an_undefaulted_one():
+    """Generated parameters are keyword-only, so the template orders them however it reads best."""
+    header = parse_header('{#def\ncurrent_route: str = "habits"\nhabits: list[HabitInfo]\n#}\n')
+
+    assert header is not None
+    assert header_errors(header) == []
+    assert header.params == [Param('current_route', 'str', "'habits'"), Param('habits', 'list[HabitInfo]')]
+
+
 def test_a_trailing_comma_per_line_is_tolerated():
     header = parse_header('{#def\nuser: User,\nitems: list[str],\n#}\n')
 
