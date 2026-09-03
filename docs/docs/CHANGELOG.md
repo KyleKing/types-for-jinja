@@ -1,3 +1,9 @@
+## Unreleased
+
+### Fix
+
+- lock pkl for the platforms CI installs on
+
 ## 1.1.3 (2026-08-16)
 
 ### Fix

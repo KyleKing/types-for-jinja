@@ -93,5 +93,5 @@ uv publish
 | `types_for_jinja/wrapper.py`                   | 124        | 3       | 0        | 96.2%    |
 | **Totals**                                     | 2254       | 160     | 39       | 90.3%    |
 
-Generated on: 2026-08-31
+Generated on: 2026-09-02
 <!-- {cte} -->
