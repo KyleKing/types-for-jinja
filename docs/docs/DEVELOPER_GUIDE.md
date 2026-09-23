@@ -89,9 +89,9 @@ uv publish
 | `types_for_jinja/remap.py`                     | 248        | 17      | 0        | 89.0%    |
 | `types_for_jinja/resolve.py`                   | 21         | 2       | 0        | 92.6%    |
 | `types_for_jinja/suppress.py`                  | 26         | 0       | 0        | 100.0%   |
-| `types_for_jinja/transpile.py`                 | 461        | 55      | 0        | 85.9%    |
+| `types_for_jinja/transpile.py`                 | 461        | 54      | 0        | 86.2%    |
 | `types_for_jinja/wrapper.py`                   | 124        | 3       | 0        | 96.2%    |
-| **Totals**                                     | 2254       | 160     | 39       | 90.3%    |
+| **Totals**                                     | 2254       | 159     | 39       | 90.3%    |
 
-Generated on: 2026-09-02
+Generated on: 2026-09-22
 <!-- {cte} -->

@@ -2,6 +2,8 @@
 
 ### Fix
 
+- **transpile**: Emit pass for an empty for-else body
+- **deps**: bump gitpython to 3.1.61
 - lock pkl for the platforms CI installs on
 
 ## 1.1.3 (2026-08-16)
