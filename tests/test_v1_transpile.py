@@ -1,5 +1,7 @@
 """Transpiler resilience on real-world Jinja constructs (no pyright needed)."""
 
+import ast
+
 from types_for_jinja.header import parse_header
 from types_for_jinja.transpile import transpile
 
@@ -58,3 +60,9 @@ def test_test_expression_uses_the_boolean_signature():
 
 def test_slice_is_emitted():
     assert 's[:4]' in _code('{#def s: str #}\n{{ s[:4] }}')
+
+
+def test_for_else_with_only_literal_text_is_valid_python():
+    code = _code('{#def items: list[str] #}\n{% for item in items %}{{ item }}{% else %}text{% endfor %}')
+
+    ast.parse(code)

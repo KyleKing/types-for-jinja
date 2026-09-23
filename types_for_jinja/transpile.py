@@ -381,7 +381,7 @@ def _emit_for(node: nodes.For, out: list[Line], indent: int, ctx: _Emit) -> None
     out.extend(inner)
     if node.else_:
         out.append(Line(indent, 'if True:', node.lineno))
-        _emit_body(node.else_, out, indent + 1, ctx)
+        _emit_block(node.else_, out, indent, node.lineno, ctx)
 
 
 def _emit_if(node: nodes.If, out: list[Line], indent: int, ctx: _Emit) -> None:
