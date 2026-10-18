@@ -8,7 +8,10 @@ line carries a ``# L<n>`` marker back to its source line in the template.
 
 from __future__ import annotations
 
+import contextvars
 import keyword
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
@@ -35,6 +38,11 @@ _CMP_OPS = {
 _ANY = '_TJAny'
 """What an untyped header name is annotated as; the preamble imports ``Any`` under this alias."""
 
+_DEFAULT_FILTERS = frozenset({'default', 'd'})
+"""Filters that accept a missing value instead of raising, ``StrictUndefined`` included."""
+
+_BOUND: contextvars.ContextVar[frozenset[str]] = contextvars.ContextVar('_tj_bound_names', default=frozenset())
+
 JINJA_GLOBALS = ('cycler', 'joiner', 'lipsum', 'namespace')
 """Globals Jinja puts in every Environment, which are otherwise undefined variables.
 
@@ -55,6 +63,11 @@ class _Emit:
     env: Environment
     syntax: Syntax
     seen: frozenset[Path] = frozenset()
+    # Header params, configured globals, and Jinja's own globals: visible in every nested stub.
+    ambient: frozenset[str] = frozenset()
+    # Imports from a template pulled in by ``{% include %}``. They have to stay outside
+    # ``_render``: layout dedents the render body, which would pull a namespace class apart.
+    included_imports: list[Line] = field(default_factory=list)
 
 
 def macro_defs(source: str, tree: nodes.Template, syntax: Syntax | None = None) -> tuple[MacroTypes, list[str]]:
@@ -105,7 +118,10 @@ def build_environment(syntax: Syntax, extensions: list[str] | None = None) -> En
 
 def deepest_line(node: nodes.Node) -> int:
     """The last line any part of ``node`` occupies; Jinja records no line for a closing tag."""
-    return max((child.lineno for child in node.find_all(nodes.Node)), default=node.lineno)
+    return max(
+        (child.lineno for child in node.find_all(nodes.Node) if child.lineno),
+        default=node.lineno,
+    )
 
 
 def _ident(name: str) -> str:
@@ -161,15 +177,49 @@ def transpile(
     env = build_environment(config.syntax, config.extensions)
     tree = env.parse(source)
     macro_types, macro_imports = macro_defs(source, tree, config.syntax)
+    ambient = _ambient_names(tree, header, config)
     ctx = _Emit(
         macro_types=macro_types,
         search_dirs=_search_dirs(template_path, config),
         env=env,
         syntax=config.syntax,
         seen=frozenset({template_path.resolve()} if template_path is not None else ()),
+        ambient=ambient,
     )
-    split = _split_top_level(tree, ctx)
+    # Set before ``_split_top_level``: loading a base template emits its macros immediately.
+    token = _BOUND.set(ambient | _bindings_in([tree]))
+    try:
+        split = _split_top_level(tree, ctx)
+        # Assignments in the extended template are in scope for its expressions.
+        widened = _BOUND.set(_BOUND.get() | _bindings_in(split.base_nodes))
+        try:
+            return _emit_module(
+                source=source,
+                header=header,
+                config=config,
+                depth=depth,
+                ctx=ctx,
+                tree=tree,
+                macro_imports=macro_imports,
+                split=split,
+            )
+        finally:
+            _BOUND.reset(widened)
+    finally:
+        _BOUND.reset(token)
 
+
+def _emit_module(
+    *,
+    source: str,
+    header: TemplateHeader,
+    config: Config,
+    depth: int,
+    ctx: _Emit,
+    tree: nodes.Template,
+    macro_imports: list[str],
+    split: _TopLevel,
+) -> GeneratedModule:
     uses, component_defs = _component_uses(source, ctx.search_dirs)
     lines = _preamble(
         header,
@@ -182,13 +232,23 @@ def transpile(
     lines.extend(split.foreign_defs)
     lines.extend(split.module_defs)
 
+    render_at = len(lines)
     lines.append(Line(0, f'def _render({_signature(header)}) -> None:', header.lineno))
     body: list[Line] = []
     _emit_body(split.render_nodes, body, 1, ctx)
     inherited: list[Line] = []
     _emit_body(split.base_nodes, inherited, 1, ctx)
+    # Jinja runs a child's top-level assignments before rendering the parent, on either side of
+    # `{% extends %}`. The parent is checked in the sidecar, which cannot see the child module, so
+    # the assignments are copied in front of it with their real right-hand sides. Stamping them
+    # with the extends line keeps that order under the stable line sort, and marking them foreign
+    # leaves the originals in the child so the aligned stub stays line-aligned.
+    if inherited:
+        body.extend(_exported_assignments(split.render_nodes, split.base_lineno))
     body.extend(_mark_foreign(inherited, split.base_lineno))
     body.extend(Line(1, use.call, use.lineno) for use in uses)
+    # Filled while the body was emitted. Inserted above ``_render`` so the dedent leaves them.
+    lines[render_at:render_at] = ctx.included_imports
     body.sort(key=lambda line: line.lineno)
     if not body:
         body.append(Line(1, 'pass', header.lineno))
@@ -220,6 +280,7 @@ def _split_top_level(tree: nodes.Template, ctx: _Emit) -> _TopLevel:
         match node:
             case nodes.Macro():
                 _emit_macro(node, split.module_defs, ctx)
+                _emit_nested_imports(node.body, ctx, split.foreign_defs, split.imports)
             case nodes.Extends():
                 defs: list[Line] = []
                 split.base_nodes.extend(_load_base_nodes(node, ctx, defs, split.imports))
@@ -235,6 +296,7 @@ def _split_top_level(tree: nodes.Template, ctx: _Emit) -> _TopLevel:
                 split.foreign_defs.extend(_mark_foreign(defs, node.lineno))
             case _:
                 split.render_nodes.append(node)
+                _emit_nested_imports([node], ctx, split.foreign_defs, split.imports)
     return split
 
 
@@ -292,6 +354,20 @@ def _extension_globals(config: Config) -> list[str]:
 def _unique(items: list[str]) -> list[str]:
     """Drop repeats while keeping the first occurrence, so a shared import is emitted once."""
     return list(dict.fromkeys(items))
+
+
+def _exported_assignments(render_nodes: list[nodes.Node], lineno: int) -> list[Line]:
+    """Top-level ``{% set %}``s, as foreign lines the extended template is checked against.
+
+    Only assignments that are direct children of the template. A ``{% set %}`` inside a block or
+    loop is a different scope and does not reach the parent; one nested in ``{% if %}`` does, and
+    stays invisible here.
+    """
+    exported: list[Line] = []
+    for node in render_nodes:
+        if isinstance(node, nodes.Assign):
+            _emit_assign(node, exported, 1)
+    return _mark_foreign(exported, lineno)
 
 
 def _mark_foreign(lines: list[Line], lineno: int) -> list[Line]:
@@ -463,7 +539,10 @@ def _emit_macro(
     signature = _macro_params(node, ctx.macro_types)
     out.append(Line(indent, f'def {name}({signature}) -> _TJAny:', node.lineno))
     inner: list[Line] = []
-    _emit_body(node.body, inner, indent + 1, ctx)
+    # A macro's parameters are local to its body, including one loaded from a base template
+    # whose names were not part of the caller's scope.
+    with _scoped(_BOUND.get() | {arg.name for arg in node.args}):
+        _emit_body(node.body, inner, indent + 1, ctx)
     if not inner:
         inner.append(Line(indent + 1, 'pass', node.lineno))
     out.extend(inner)
@@ -527,10 +606,16 @@ def _load_base_nodes(
     for child in loaded.tree.body:
         if isinstance(child, nodes.Macro):
             _emit_macro(child, module_defs, base_ctx)
+            _emit_nested_imports(child.body, base_ctx, module_defs, imports)
         elif isinstance(child, nodes.Extends):
             top_level.extend(_load_base_nodes(child, base_ctx, module_defs, imports))
+        elif isinstance(child, nodes.Import):
+            _emit_import(child, base_ctx, module_defs, imports)
+        elif isinstance(child, nodes.FromImport):
+            _emit_from_import(child, base_ctx, module_defs, imports)
         elif not isinstance(child, nodes.Block):
             top_level.append(child)
+            _emit_nested_imports([child], base_ctx, module_defs, imports)
     return top_level
 
 
@@ -564,9 +649,14 @@ def _emit_include(node: nodes.Include, out: list[Line], indent: int, ctx: _Emit)
     body: list[Line] = [Line(1, imp, node.lineno) for imp in header.imports]
     body.append(Line(1, f'def {name}({_signature(header)}) -> None:', node.lineno))
     # depth=0: the sidecar this lands in always sits at the output root (see _sidecar).
-    inner: list[Line] = [Line(2, imp, node.lineno) for imp in filter_imports(loaded.tree, depth=0)]
-    top_level = [child for child in loaded.tree.body if not isinstance(child, nodes.Extends)]
-    _emit_body(top_level, inner, 2, include_ctx)
+    # The included body is checked as its own function, so only its header, its own
+    # bindings, and the ambient names (which the sidecar preamble still declares) are in scope.
+    include_names = ctx.ambient | {param.name for param in header.params} | _bindings_in([loaded.tree])
+    with _scoped(include_names):
+        inner: list[Line] = [Line(2, imp, node.lineno) for imp in filter_imports(loaded.tree, depth=0)]
+        top_level = [child for child in loaded.tree.body if not isinstance(child, nodes.Extends)]
+        _emit_included_imports(top_level, include_ctx, node.lineno)
+        _emit_body(top_level, inner, 2, include_ctx)
     if not inner:
         inner.append(Line(2, 'pass', node.lineno))
     body.extend(inner)
@@ -587,7 +677,11 @@ def _emit_untyped_include(
     types, _ = macro_defs(loaded.source, loaded.tree, ctx.syntax)
     body = [child for child in loaded.tree.body if not isinstance(child, nodes.Extends)]
     inner: list[Line] = []
-    _emit_body(body, inner, indent, replace(ctx, macro_types=types, seen=loaded.seen))
+    included = replace(ctx, macro_types=types, seen=loaded.seen)
+    _emit_included_imports(body, included, node.lineno)
+    # An untyped include is inlined into the caller's scope, plus the names it binds itself.
+    with _scoped(_BOUND.get() | _bindings_in(body)):
+        _emit_body(body, inner, indent, included)
     out.extend(_mark_foreign(inner, node.lineno))
 
 
@@ -615,6 +709,53 @@ def _load_template(reference: nodes.Node, ctx: _Emit) -> _LoadedTemplate | None:
     except TemplateSyntaxError:
         return None
     return _LoadedTemplate(source=source, tree=tree, seen=ctx.seen | {path.resolve()})
+
+
+def _emit_included_imports(nodes: list[nodes.Node], ctx: _Emit, lineno: int) -> None:
+    """Bind ``{% import %}`` and ``{% from %}`` from a template ``{% include %}`` pulls in.
+
+    The included body is copied into this stub, so a call there is checked here. The import
+    tag is not itself a call, and dropping it leaves the alias undefined.
+    """
+    defs: list[Line] = []
+    found: list[str] = []
+    _emit_nested_imports(nodes, ctx, defs, found)
+    ctx.included_imports.extend(_mark_foreign([Line(0, text, lineno) for text in _unique(found)], lineno))
+    ctx.included_imports.extend(_mark_foreign(defs, lineno))
+
+
+def _emit_nested_imports(
+    roots: list[nodes.Node],
+    ctx: _Emit,
+    module_defs: list[Line],
+    imports: list[str],
+) -> None:
+    """Bind macros imported from inside a block, branch, or macro.
+
+    ``_split_top_level`` only emits an ``{% import %}`` or ``{% from %}`` that is a direct
+    child of the template. Anywhere else the body walker has no case for the tag, so it
+    emits the call and drops the binding, and the checker reports the alias as undefined.
+    """
+    for root in roots:
+        _emit_imports_under(root, ctx, module_defs, imports)
+
+
+def _emit_imports_under(
+    node: nodes.Node,
+    ctx: _Emit,
+    module_defs: list[Line],
+    imports: list[str],
+) -> None:
+    defs: list[Line] = []
+    match node:
+        case nodes.Import():
+            _emit_import(node, ctx, defs, imports)
+            module_defs.extend(_mark_foreign(defs, node.lineno))
+        case nodes.FromImport():
+            _emit_from_import(node, ctx, defs, imports)
+            module_defs.extend(_mark_foreign(defs, node.lineno))
+    for child in node.iter_child_nodes():
+        _emit_imports_under(child, ctx, module_defs, imports)
 
 
 def _emit_from_import(
@@ -762,14 +903,106 @@ def _call(node: nodes.Call) -> str:
     return f'{_expr(node.node)}(' + ', '.join(args) + ')'
 
 
+def _ambient_names(tree: nodes.Template, header: TemplateHeader, config: Config) -> frozenset[str]:
+    """Names the generated module binds for the whole template, not inside one block."""
+    names = {param.name for param in header.params}
+    names.update(name for name, _ in config.globals)
+    names.update(_extension_globals(config))
+    names.update(_jinja_globals(tree, config))
+    return frozenset(names)
+
+
+def _bindings_in(roots: list[nodes.Node]) -> frozenset[str]:
+    """Every name ``roots`` bind: assignments, loop targets, macros, and imports."""
+    names: set[str] = set()
+    for root in roots:
+        names.update(_binding_names(root))
+        for node in root.find_all(nodes.Node):
+            names.update(_binding_names(node))
+    return frozenset(names)
+
+
+def _binding_names(node: nodes.Node) -> list[str]:
+    match node:
+        case nodes.Assign() | nodes.AssignBlock() | nodes.For():
+            return _stored_names(node.target)
+        case nodes.With():
+            return [name for target in node.targets for name in _stored_names(target)]
+        case nodes.Macro():
+            return [node.name, *(arg.name for arg in node.args)]
+        case nodes.Import():
+            return [node.target]
+        case nodes.FromImport():
+            return [entry[1] if isinstance(entry, tuple) else entry for entry in node.names]
+        case _:
+            return []
+
+
+def _stored_names(target: nodes.Node) -> list[str]:
+    match target:
+        case nodes.Name():
+            return [target.name]
+        case nodes.Tuple() | nodes.List():
+            return [name for item in target.items for name in _stored_names(item)]
+        case _:
+            return []
+
+
+@contextmanager
+def _scoped(names: frozenset[str]) -> Iterator[None]:
+    """Bind ``names`` for the duration of one nested emit."""
+    token = _BOUND.set(names)
+    try:
+        yield
+    finally:
+        _BOUND.reset(token)
+
+
 def _filtered(node: nodes.Filter | nodes.Test) -> str:
     """Apply a filter or test as a call, using its declared signature when there is one."""
     if node.node is None:
         raise UnsupportedTemplateError(type(node).__name__)
+    softened = _soft_default(node)
+    if softened is not None:
+        return _softened_default(softened)
     args = [_expr(node.node)]
     args.extend(_expr(arg) for arg in node.args)
     args.extend(f'{kw.key}={_expr(kw.value)}' for kw in node.kwargs)
     return f'{_filter_callable(node)}(' + ', '.join(args) + ')'
+
+
+def _soft_default(node: nodes.Node) -> nodes.Filter | None:
+    """A ``default``/``d`` whose value is a bare name this template never binds.
+
+    Jinja passes that name in as an Undefined object instead of raising, and that is true
+    with ``StrictUndefined`` as well. The filter then returns its default argument, so the
+    stub has to check that argument rather than the missing name. Attribute access stays
+    strict: ``foo.bar | default`` still raises under ``StrictUndefined``.
+    """
+    if not isinstance(node, nodes.Filter) or node.name not in _DEFAULT_FILTERS:
+        return None
+    value = node.node
+    if isinstance(value, nodes.Name) and value.ctx == 'load' and value.name not in _BOUND.get():
+        return node
+    return None
+
+
+def _softened_default(node: nodes.Filter) -> str:
+    """The default argument, which is the value of ``default`` for an unbound name."""
+    positional = [_expr(arg) for arg in node.args]
+    value = positional[0] if positional else "''"
+    checked = positional[1:]
+    for kw in node.kwargs:
+        rendered = _expr(kw.value)
+        if not positional and kw.key == 'default_value':
+            value = rendered
+        else:
+            checked.append(rendered)
+    if not checked:
+        return value
+    # The extras (the ``boolean`` flag, usually) still need checking. Indexing keeps the
+    # default argument's type as the type of the whole expression.
+    return f'({value}, {", ".join(checked)})[0]'
 
 
 def _filter_callable(node: nodes.Filter | nodes.Test) -> str:
@@ -790,7 +1023,7 @@ def filter_imports(*trees: nodes.Node, depth: int = 0) -> list[str]:
         used.update(
             filters.stub_name(node.name)
             for node in tree.find_all(nodes.Filter)
-            if node.node is not None and node.name in filters.RETURNS
+            if node.node is not None and node.name in filters.RETURNS and _soft_default(node) is None
         )
         if any(node.node is not None for node in tree.find_all(nodes.Test)):
             used.add(filters.TEST_STUB)
